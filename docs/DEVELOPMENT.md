@@ -3,8 +3,9 @@
 ## Prasyarat
 
 - Bash 4+
-- `fzf` (lokal di `~/.local/bin/fzf` atau system-wide)
+- `fzf` 0.60+ (lokal di `~/.local/bin/fzf`, terpasang `0.75`)
 - `git` (untuk versioning)
+- `python3` (untuk validasi JSON di `list --json` dan test)
 - `tmux` (opsional, untuk uji UI)
 - Tool yang ingin diuji (ping, nmap, dll.)
 
@@ -25,24 +26,38 @@ membuat backup direktori config lama bila ada.
 
 ```bash
 cd ~/tools/netlauncher
-$EDITOR bin/netlauncher
+$EDITOR lib/menu.sh
 make check
+make lint
 ```
 
 `make check` menjalankan:
 
-1. `bash -n bin/netlauncher`
+1. `bash -n` pada `bin/netlauncher`, `lib/*.sh`, `config/automations/*.sh`, `scripts/*.sh`, `tests/smoke.sh`
 2. `tests/smoke.sh`
 
 Uji manual yang disarankan setelah perubahan:
 
 ```bash
 netlauncher --version
-netlauncher --preview-tool ping
-netlauncher --preview-category dns
-netlauncher --preview-recipe cek-koneksi
+netlauncher lint
 netlauncher selftest
 netlauncher doctor
+netlauncher list --json | head -n 20
+netlauncher --preview-tool ping
+netlauncher --preview-snippet 2
+netlauncher --preview-category dns
+netlauncher --preview-recipe audit-web
+```
+
+Untuk menguji tanpa menyentuh konfigurasi atau data pengguna:
+
+```bash
+tmp_cfg="$(mktemp -d)" tmp_data="$(mktemp -d)"
+cp config/tools.tsv config/snippets.tsv config/help.md "$tmp_cfg/"
+NETLAUNCHER_CONFIG_DIR="$tmp_cfg" NETLAUNCHER_DATA_DIR="$tmp_data" \
+  ./bin/netlauncher --no-anim --dry-run recipe cek-koneksi < /dev/null
+rm -rf "$tmp_cfg" "$tmp_data"
 ```
 
 Karena live path adalah symlink, tidak ada langkah deploy untuk script dan
@@ -51,25 +66,32 @@ config. Cukup edit lalu jalankan.
 ## Uji UI dengan tmux
 
 ```bash
-tmux new -d -s nl-dev -x 120 -y 40 "netlauncher"
-sleep 1
-tmux capture-pane -pt nl-dev -S -40
+make ui-test
+```
 
-# navigasi: Enter, panah, Esc
-tmux send-keys -t nl-dev Enter
-tmux capture-pane -pt nl-dev -S -40
+Atau manual:
 
+```bash
+tmux new -d -s nl-dev -x 120 -y 36 "netlauncher"
+sleep 1.2
+tmux capture-pane -pt nl-dev
+
+# uji shortcut: Ctrl-E (snippets), Ctrl-S (search), Ctrl-T (tema), Ctrl-L (riwayat)
+tmux send-keys -t nl-dev C-e
+sleep 0.6
+tmux capture-pane -pt nl-dev
+
+tmux send-keys -t nl-dev Escape
 tmux send-keys -t nl-dev Escape
 tmux kill-session -t nl-dev
 ```
 
 Hal yang perlu dicek:
 
-- Banner dan header tampil tanpa terpotong.
-- Menu utama bisa difilter dan dibuka.
-- Preview tool/kategori/resep/wordlist benar.
-- `Esc` kembali tanpa meninggalkan proses.
-- Eksekusi `ping 127.0.0.1` menghasilkan exit 0 dan log.
+- Splash screen dan progress bar berjalan mulus tanpa artefak.
+- Frame rounded, header status sistem, daftar, preview, dan footer tampil rapi.
+- Menu utama, kategori, snippet (`Ctrl-E`), pencarian global (`Ctrl-S`), tema (`Ctrl-T`), dan riwayat (`Ctrl-L`) berfungsi.
+- `Esc` kembali tanpa meninggalkan proses atau merusak kursor terminal.
 
 ## Debugging
 
@@ -86,47 +108,29 @@ ls -lt ~/.local/share/netlauncher/logs | head
 tail -20 ~/.local/share/netlauncher/history.log
 ```
 
-Uji fzf secara terpisah:
-
-```bash
-printf 'a\nb\n' | fzf --height=40% --layout=reverse
-```
-
-Jika preview tidak muncul, pastikan `$SELF` menunjuk ke path repo yang benar:
-
-```bash
-bash -c 'source bin/netlauncher' 2>/dev/null || true
-readlink -f ~/.local/bin/netlauncher
-```
-
-## Menambah tool
+## Menambah tool & snippet
 
 1. Cek binary: `command -v <binary>`.
-2. Tambahkan baris ke `config/tools.tsv` (11 field).
-3. Jika kategori baru, ubah `CAT_NAMES`, `CAT_DESC`, dan `main_menu()`.
-4. Perbarui `config/help.md`.
-5. Jalankan `make check`, `netlauncher selftest`, dan preview tool.
-
-Contoh baris:
-
-```text
-diagnostik|mtr|MTR|mtr|mtr -rw %s|Diagnostik rute interaktif.|mtr --help|0|Host/target|term|mtr -rw 1.1.1.1
-```
+2. Tambahkan baris ke `config/tools.tsv` (11 field, hindari karakter `|`).
+3. Tambahkan contoh perintah ke `config/snippets.tsv` (6 field tab-delimited).
+4. Jika kategori baru, ubah `CAT_NAMES`, `CAT_ICONS`, `CAT_DESC` di `lib/core.sh` dan `main_menu()` di `lib/menu.sh`.
+5. Perbarui `config/help.md`.
+6. Jalankan `make check`, `netlauncher lint`, `netlauncher selftest`, dan preview tool.
 
 ## Menambah resep
 
-1. Tulis `recipe_<nama>()` di `bin/netlauncher`.
-2. Tampilkan perintah, minta konfirmasi untuk aksi berdampak, catat log.
-3. Daftarkan di `preview_recipe()`, `recipes_menu()`, `run_recipe()`.
-4. Tambahkan ke `print_cli_help()` dan `config/help.md`.
-5. Uji: `netlauncher recipe <nama> < /dev/null`.
+1. Tulis `recipe_<nama>()` di `lib/recipes.sh`.
+2. Dukung `DRY_RUN=1`, tampilkan perintah, minta konfirmasi untuk aksi berdampak, catat log.
+3. Daftarkan di `preview_recipe()`, `recipes_menu()`, dan `run_recipe()`.
+4. Tambahkan ke `print_cli_help()` di `lib/doctor.sh` dan `config/help.md`.
+5. Uji: `netlauncher --dry-run recipe <nama> < /dev/null`.
 
 Jangan menambahkan otomasi ofensif. Resep harus tetap berupa diagnostik,
 inventaris, atau audit dengan konfirmasi otorisasi.
 
 ## Menambah sumber wordlist
 
-Tambahkan pemanggilan `add_wordlist` atau `add_dir` di `wordlist_refresh()`:
+Tambahkan pemanggilan `add_wordlist` atau `add_dir` di `_wordlist_build_index()` pada `lib/wordlists.sh`:
 
 ```bash
 add_wordlist "Nama" "/path/file.txt" "Kategori" "Sumber" "Lisensi"
@@ -144,8 +148,8 @@ Perbarui juga `~/wordlists/README.md` untuk sumber, lisensi, dan SHA256.
 
 ## Menambah perintah CLI
 
-1. Tambahkan cabang di `case` dalam `main()`.
-2. Tambahkan dokumentasi di `print_cli_help()`.
+1. Tambahkan cabang di `case` dalam `main()` pada `bin/netlauncher`.
+2. Tambahkan dokumentasi di `print_cli_help()` (`lib/doctor.sh`).
 3. Perbarui `config/help.md`, `README.md`, dan `docs/CHANGELOG.md`.
 4. Uji dengan `< /dev/null` agar tidak menggantung.
 
@@ -153,6 +157,8 @@ Perbarui juga `~/wordlists/README.md` untuk sumber, lisensi, dan SHA256.
 
 ```bash
 make check
+make lint
+make ui-test
 git status --short
 git diff --check
 ```
@@ -160,7 +166,7 @@ git diff --check
 Pastikan tidak ada:
 
 - password, token, atau kredensial;
-- `config/favorites.tsv` atau `config/wordlists.tsv`;
+- `config/favorites.tsv`, `config/wordlists.tsv`, atau `config/theme.env`;
 - file log atau laporan;
 - perubahan yang tidak terkait.
 
@@ -168,14 +174,7 @@ Pastikan tidak ada:
 
 ```bash
 make backup
-# hasil: ~/netlauncher-backup-YYYY-MM-DD.tar.gz
-```
-
-Pemulihan:
-
-```bash
-tar xzf ~/netlauncher-backup-YYYY-MM-DD.tar.gz -C /tmp
-# salin kembali bin/ dan config/ ke repo, lalu make install
+# hasil: ~/netlauncher-backup-YYYYMMDD-HHMMSS.tar.gz
 ```
 
 ## Konvensi commit

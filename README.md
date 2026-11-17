@@ -1,25 +1,42 @@
 # NetLauncher
 
-Launcher terminal modern untuk tool jaringan dan keamanan di Kali Linux.
-UI berbasis `fzf`, berbahasa Indonesia, dengan registry tool yang mudah dikembangkan.
+Smart Network & Security Command Center berbasis terminal (`Bash + fzf 0.75`)
+untuk Kali Linux. UI modern berbahasa Indonesia dengan tema truecolor, animasi
+terminal, deteksi konteks jaringan otomatis, 104 contoh perintah siap pakai,
+Command Builder, Custom Automation Scripts, dan 10 resep otomasi aman.
 
 > **Authorized use only.** Gunakan hanya pada aset/jaringan milik sendiri atau
 > yang ada izin tertulis. Launcher ini membuka tool yang sudah terpasang dan tidak
 > menyediakan otomasi serangan (deauth, handshake capture, brute-force).
 
-## Fitur
+## Fitur Utama (v2.0.0)
 
-- Menu kategori: Diagnostik, DNS & Web, Interface & Routing, Pemindaian &
-  Monitoring, Wireless (berizin), Tool Keamanan, dan Hackingtool.
-- Pencarian fuzzy + panel preview untuk setiap tool, kategori, wordlist, dan resep.
-- Deteksi otomatis tool terpasang (`✓`) atau belum (`✗`).
-- Aksi per tool: jalankan, jalankan dengan argumen, bantuan, contoh, favorit.
-- Browser wordlist: preview, salin path, buka di `less`, statistik.
-- Resep aman: cek koneksi, info jaringan, scan target berizin, capture, DNS,
-  statistik wordlist, laporan Markdown.
-- Riwayat 100 perintah, favorit, dan log per sesi.
-- `doctor`, `selftest`, `update`, serta integrasi desktop entry dan alias `net`.
-- Integrasi `hackingtool 3.1.0` (TUI 219 tool).
+- **UI Terminal Modern & Animasi**: `fzf 0.75` `--style=full:rounded` dengan
+  outer frame, panel status sistem real-time, inspector preview, splash screen
+  ASCII, progress bar, dan spinner murni Bash (`--no-anim` untuk menonaktifkan).
+- **4 Tema Truecolor**: `cyber` (default), `tokyo`, `emerald`, dan `amber`
+  dengan pratinjau palet langsung (`Ctrl-T` atau `netlauncher theme`).
+- **51 Tool dalam 7 Kategori**: Diagnostik Jaringan (8), DNS & Web (14),
+  Interface & Routing (8), Pemindaian & Monitoring (9), Wireless Berizin (5),
+  Tool Keamanan Berizin (4), dan Hackingtool (3).
+- **Pencarian Global (`Ctrl-S`)**: cari lintas 51 tool dan 104 contoh perintah
+  sekaligus dalam satu layar.
+- **104 Contoh Perintah & Code Snippets (`Ctrl-E`)**: lengkap dengan penjelasan,
+  cuplikan Bash, Smart Fill parameter, edit sebelum jalan, salin clipboard,
+  `--dry-run`, dan simpan ke Custom Automation.
+- **Smart Context & Command Builder**: deteksi otomatis interface aktif, IP/CIDR,
+  subnet, gateway, DNS, dan SSID WiFi; saran target/interface/domain/wordlist
+  kontekstual; serta Missing Tool Advisor.
+- **Custom Automation Scripts**: kelola, buat, edit, dan jalankan script Bash
+  otomasi di `config/automations/` (termasuk 4 starter script siap pakai).
+- **10 Resep Otomasi Aman**: `cek-koneksi`, `info-jaringan`, `audit-web`, `dns`,
+  `monitor-port`, `discovery-lokal`, `scan-target`, `capture`, `wordlist-stats`,
+  dan `laporan` (semua mendukung `--dry-run`).
+- **Wordlist Browser (136 entri)**: `rockyou.txt`, SecLists, dan 4 koleksi
+  wordlist Indonesia (`geovedi`, `KBBI v6.1.0`, `REI`, `SecLists ID`).
+- **Riwayat, Log Viewer (`Ctrl-L`), & CLI Lengkap**: `lint`, `selftest`,
+  `doctor`, `list --json`, `update`, rotasi log > 30 hari, desktop entry, dan
+  alias `net`.
 
 ## Instalasi di mesin ini
 
@@ -39,44 +56,49 @@ make install
 ./scripts/install.sh
 ```
 
-Prasyarat: `fzf`, `bash`, dan tool yang ingin dipakai. Verifikasi dengan:
+Prasyarat: `fzf` (disarankan 0.60+, terpasang `0.75`), `bash` 4+, dan tool yang
+ingin dipakai. Verifikasi dengan:
 
 ```bash
 netlauncher doctor
+netlauncher lint
 netlauncher selftest
 ```
 
 ## Penggunaan
 
 ```bash
-net                          # alias untuk netlauncher
-netlauncher                  # menu utama
-netlauncher help             # panduan lengkap
-netlauncher doctor           # cek dependensi
-netlauncher selftest         # validasi registry
-netlauncher wordlists        # browser wordlist
-netlauncher wordlists refresh
-netlauncher update
-netlauncher tool <id>
-netlauncher recipe <nama>
+net                               # alias untuk netlauncher
+netlauncher                       # menu utama interaktif
+netlauncher search                # pencarian global tool & contoh perintah
+netlauncher examples [tool_id]    # browser contoh perintah & code snippets
+netlauncher automation            # kelola & jalankan custom automation scripts
+netlauncher wordlists [refresh]   # browser / refresh index wordlist
+netlauncher logs                  # buka viewer log sesi
+netlauncher theme [nama]          # ubah tema (cyber|tokyo|emerald|amber)
+netlauncher tool <id>             # jalankan tool langsung
+netlauncher recipe <nama>         # jalankan resep otomasi aman
+netlauncher list [--json]         # daftar semua tool (tabel atau JSON)
+netlauncher doctor                # cek dependensi & terminal
+netlauncher selftest              # validasi registry & snippet
+netlauncher lint                  # validasi ketat format TSV & syntax
+netlauncher update                # update hackingtool + index wordlist
+netlauncher help                  # panduan lengkap
 netlauncher --version
 ```
 
-Navigasi: ketik untuk mencari, `Enter` membuka, `Esc` kembali,
-`Ctrl-/` menampilkan/menyembunyikan preview.
+Opsi global: `--no-anim`, `--dry-run`, `--theme <nama>`.
+
+Shortcut di menu utama:
+
+- `Enter` membuka, `Esc` kembali, `Ctrl-/` toggle preview
+- `Ctrl-S` pencarian global, `Ctrl-E` contoh perintah, `Ctrl-T` tema & animasi, `Ctrl-L` riwayat & log
 
 Resep yang tersedia:
 
 ```text
-cek-koneksi, info-jaringan, scan-target, capture, dns, wordlist-stats, laporan
-```
-
-Contoh:
-
-```bash
-netlauncher tool ping
-netlauncher recipe cek-koneksi
-netlauncher recipe laporan
+cek-koneksi, info-jaringan, audit-web, dns, monitor-port,
+discovery-lokal, scan-target, capture, wordlist-stats, laporan
 ```
 
 ## Wordlist
@@ -97,8 +119,9 @@ Detail sumber, lisensi, dan SHA256: `~/wordlists/README.md`.
 ```bash
 cd ~/tools/netlauncher
 make check        # syntax + smoke test
-make test         # smoke test lengkap
-make ui-test      # buka UI di tmux (jika ada tmux)
+make lint         # netlauncher lint + shellcheck (jika ada)
+make test         # sama dengan check
+make ui-test      # uji UI di tmux
 make backup       # arsip konfigurasi + script
 ```
 
@@ -114,13 +137,16 @@ Baca:
 ## Struktur
 
 ```text
-bin/netlauncher       script utama
-config/tools.tsv      registry tool (11 field)
+bin/netlauncher       entrypoint CLI & loop menu utama
+lib/*.sh              8 modul (core, ui, smart, snippets, wordlists, recipes, menu, doctor)
+config/tools.tsv      registry 51 tool (11 field)
+config/snippets.tsv   104 contoh perintah & code snippets (6 field tab-delimited)
+config/automations/   starter & custom automation scripts (*.sh)
 config/help.md        panduan di dalam TUI
-config/               runtime favorites/wordlists (tidak di-track)
+config/               runtime favorites/wordlists/theme.env (tidak di-track)
 docs/                 dokumentasi teknis
 tests/smoke.sh        uji non-interaktif
-scripts/              install dan backup
+scripts/              install, backup, dan ui-test
 ```
 
 ## Lisensi dan batasan

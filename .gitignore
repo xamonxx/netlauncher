@@ -1,6 +1,7 @@
 # State runtime per mesin
 config/favorites.tsv
 config/wordlists.tsv
+config/theme.env
 
 # Log dan arsip
 *.log

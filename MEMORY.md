@@ -1,6 +1,7 @@
 # NetLauncher — Memory / Project Context
 
 - **Terakhir diperbarui:** 2026-11-17
+- **Versi aktif:** 2.0.0
 - **Status:** terpasang dan terverifikasi
 - **Repo / lokasi kanonik:** `~/tools/netlauncher/`
 - **File ini:** `~/tools/netlauncher/MEMORY.md`
@@ -32,7 +33,7 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 
 ### fzf
 
-- Binary: `~/.local/bin/fzf`
+- Binary: `~/.local/bin/fzf` (versi 0.75 dengan dukungan `--style=full:rounded`, `--border-label`, `--ghost`, `--footer`, `--input-label`, `--list-label`, `--header-label`)
 - Dipasang tanpa sudo:
   ```bash
   GOBIN="$HOME/.local/bin" go install github.com/junegunn/fzf@latest
@@ -69,13 +70,25 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 ├── AGENTS.md                               # aturan kontribusi/agen
 ├── MEMORY.md                               # file ini
 ├── README.md                               # dokumentasi pengguna
-├── Makefile                                # check/test/install/backup
-├── bin/netlauncher                         # script utama (Bash, 953 baris)
+├── Makefile                                # check/test/lint/install/backup/ui-test
+├── bin/netlauncher                         # entrypoint CLI & menu loop (Bash)
+├── lib/
+│   ├── core.sh                             # path, env override, helper, registry, target history
+│   ├── ui.sh                               # 4 tema truecolor, animasi, badge, wrapper fzf
+│   ├── smart.sh                            # konteks jaringan, smart picker, command builder, advisor
+│   ├── snippets.sh                         # browser & runner 104 contoh perintah
+│   ├── wordlists.sh                        # indexer & browser wordlist
+│   ├── recipes.sh                          # 10 resep aman & custom automation scripts
+│   ├── menu.sh                             # menu utama, pencarian global, aksi tool, riwayat & log
+│   └── doctor.sh                           # doctor, selftest, lint, list (--json), update, help
 ├── config/
-│   ├── tools.tsv                           # registry 35 tool, 11 field
+│   ├── tools.tsv                           # registry 51 tool, 11 field (delimiter |)
+│   ├── snippets.tsv                        # 104 contoh perintah, 6 field (delimiter tab)
+│   ├── automations/                        # 4 starter script + custom automation (*.sh)
 │   ├── help.md                             # panduan pengguna
 │   ├── favorites.tsv                       # runtime, tidak di-track
 │   ├── wordlists.tsv                       # index 136 wordlist, tidak di-track
+│   ├── theme.env                           # runtime preferensi tema/animasi, tidak di-track
 │   └── MEMORY.md                           # symlink ke ../MEMORY.md
 ├── docs/
 │   ├── ARCHITECTURE.md
@@ -85,7 +98,8 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 ├── tests/smoke.sh
 └── scripts/
     ├── install.sh
-    └── backup.sh
+    ├── backup.sh
+    └── ui-test.sh
 
 # Symlink live -> repo
 ~/.local/bin/netlauncher -> ~/tools/netlauncher/bin/netlauncher
@@ -100,8 +114,9 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 
 # Runtime (di luar repo)
 ~/.local/share/netlauncher/
-├── logs/                                   # log per sesi, permission 700
-└── history.log                             # riwayat perintah
+├── logs/                                   # log per sesi, permission 700, rotasi > 30 hari
+├── history.log                             # riwayat perintah
+└── targets.history                         # riwayat target/domain/URL untuk Smart Picker
 
 ~/wordlists/                                # wordlist lokal
 ├── README.md                               # sumber, lisensi, SHA256
@@ -118,13 +133,15 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 Permission penting:
 
 - `~/.local/share/netlauncher/` dan `logs/`: `700`
-- `history.log`, `favorites.tsv`, `wordlists.tsv`, log: `600`
+- `history.log`, `targets.history`, `favorites.tsv`, `wordlists.tsv`, `theme.env`, log: `600`
 
 ### Alur kerja repo
 
 ```bash
 cd ~/tools/netlauncher
-make check                  # bash -n + smoke test
+make check                  # syntax + smoke test
+make lint                   # netlauncher lint + shellcheck (jika ada)
+make ui-test                # uji UI di tmux
 netlauncher selftest
 netlauncher doctor
 make backup                 # arsip script + konfigurasi
@@ -135,15 +152,15 @@ make backup                 # arsip script + konfigurasi
 - Detail arsitektur: `docs/ARCHITECTURE.md`.
 - Alur pengembangan dan checklist: `docs/DEVELOPMENT.md`.
 - Rencana fitur: `docs/ROADMAP.md`; riwayat perubahan: `docs/CHANGELOG.md`.
-- `favorites.tsv` dan `wordlists.tsv` bersifat runtime dan tidak di-track git.
+- `favorites.tsv`, `wordlists.tsv`, dan `theme.env` bersifat runtime dan tidak di-track git.
 
 ---
 
-## 4. Arsitektur Launcher
+## 4. Arsitektur Launcher (v2.0.0)
 
-`bin/netlauncher` adalah script Bash mandiri dengan UI `fzf`. Sumber kanonik ada di
-repo; path live `~/.local/bin/netlauncher` adalah symlink, sehingga edit di repo
-langsung berlaku tanpa menyalin ulang.
+`bin/netlauncher` adalah entrypoint ringan yang memuat 8 modul di `lib/*.sh`.
+Sumber kanonik ada di repo; path live `~/.local/bin/netlauncher` adalah symlink,
+sehingga edit di repo langsung berlaku tanpa menyalin ulang.
 
 ### Registry tool: `tools.tsv`
 
@@ -153,59 +170,64 @@ Format 11 field, delimiter `|`:
 category|id|label|binary|template|description|help|sudo|arg_prompt|mode|examples
 ```
 
-Keterangan:
+Total: **51 entri** (seluruh 51 binary terpasang di mesin ini).
 
-- `category` — id kategori (`diagnostik`, `dns`, `interface`, `scan`, `wireless`, `security`, `hackingtool`)
-- `id` — id unik tool
-- `label` — nama tampilan
-- `binary` — binary yang dicek via `command -v`
-- `template` — perintah; `%s` diganti argumen pengguna
-- `description` — deskripsi singkat
-- `help` — perintah bantuan (`tool --help` atau `man tool`)
-- `sudo` — `1` jika butuh sudo
-- `arg_prompt` — label prompt argumen; kosong jika tidak perlu
-- `mode` — `term` atau `gui`
-- `examples` — contoh singkat
+### Koleksi Contoh Perintah: `snippets.tsv`
 
-Total: **35 entri**.
+Format 6 field, delimiter **TAB** (`\t`) agar aman terhadap shell pipe `|`:
+
+```text
+tool_id	title	command	notes	sudo	placeholders
+```
+
+Total: **104 entri** mencakup seluruh 51 tool.
 
 ### Kategori
 
-- Diagnostik Jaringan — ping, traceroute, curl, wget
-- DNS & Web — dig, nslookup, whatweb, nikto, gobuster, ffuf, httpx, nuclei, amass, sqlmap, searchsploit
-- Interface & Routing — ip addr, ip route, ss, netstat, iw dev
-- Pemindaian & Monitoring — nmap, tcpdump, wireshark
-- Wireless (Berizin) — airmon-ng, aircrack-ng, kismet, reaver, wifite
-- Tool Keamanan (Berizin) — hydra, john, hashcat, msfconsole
-- Hackingtool — TUI, classic REPL, bantuan
+- Diagnostik Jaringan (8) — `ping`, `traceroute`, `curl`, `wget`, `whois`, `openssl`, `nc`, `socat`
+- DNS & Web (14) — `dig`, `nslookup`, `whatweb`, `nikto`, `gobuster`, `ffuf`, `feroxbuster`, `dirb`, `wfuzz`, `httpx`, `nuclei`, `amass`, `sqlmap`, `searchsploit`
+- Interface & Routing (8) — `ip addr`, `ip route`, `ss`, `netstat`, `iw dev`, `nmcli`, `ethtool`, `lsof`
+- Pemindaian & Monitoring (9) — `nmap`, `masscan`, `arp-scan`, `netdiscover`, `tcpdump`, `tshark`, `tcpflow`, `ngrep`, `wireshark`
+- Wireless (Berizin) (5) — `airmon-ng`, `aircrack-ng`, `kismet`, `reaver`, `wifite`
+- Tool Keamanan (Berizin) (4) — `hydra`, `john`, `hashcat`, `msfconsole`
+- Hackingtool (3) — TUI, classic REPL, bantuan
 
-### Fitur UI
+### Fitur UI & Pintar
 
-- Banner `figlet`, header host/IP/interface/jumlah tool/tanggal
-- fzf: fuzzy search, preview panel, border rounded, warna ANSI
-- Deteksi tool terpasang (`✓`) / belum (`✗`)
-- Aksi per tool: Jalankan, Jalankan dengan argumen, Bantuan, Contoh, Favorit
-- Prompt argumen otomatis, konfirmasi sudo
-- Favorit dan riwayat 100 perintah terakhir
-- Log per sesi
+- Splash screen ASCII animasi + progress bar + spinner murni Bash (`--no-anim` / `NETLAUNCHER_NO_ANIM=1` untuk menonaktifkan)
+- `fzf 0.75` `--style=full:rounded --border=rounded --height=100%` dengan panel Status Sistem, Pencarian, Daftar, Inspector Preview, dan Footer
+- 4 tema truecolor (`cyber`, `tokyo`, `emerald`, `amber`) dengan pratinjau palet langsung (`Ctrl-T`)
+- Shortcut menu utama: `Ctrl-S` (Global Search), `Ctrl-E` (Code Snippets), `Ctrl-T` (Tema & Animasi), `Ctrl-L` (Riwayat & Log)
+- Smart Network Context (`smart_net_context`): deteksi interface aktif, IP/CIDR, subnet, gateway, DNS, SSID WiFi, status `ONLINE`/`LOKAL`/`OFFLINE`
+- Smart Placeholder Picker (`smart_prompt_placeholder`): saran kontekstual + riwayat target untuk `{TARGET}`, `{SUBNET}`, `{IFACE}`, `{DOMAIN}`, `{URL}`, `{PORT}`, `{WORDLIST}`, `{FILE}`, `{QUERY}`
+- Command Builder (`smart_command_builder`): pilih preset/template, isi parameter pintar, edit perintah, jalankan / salin / dry-run
+- Missing Tool Advisor (`smart_missing_advisor`): saran instalasi + alternatif terpasang
+- Custom Automation Scripts (`config/automations/*.sh`): 4 starter script + buat/edit/jalankan script kustom
 - Browser wordlist: preview, salin path, buka di `less`, statistik
-- `doctor`, `selftest`, `update`
+- `doctor`, `selftest`, `lint`, `list --json`, `update`, `--dry-run`, `--no-anim`, `--theme`
 - Desktop entry dan alias `net`
 
 ### Perintah CLI
 
 ```bash
-netlauncher                  # menu utama
-netlauncher --help
-netlauncher help             # panduan lengkap
-netlauncher doctor           # cek dependensi
-netlauncher selftest         # validasi registry
-netlauncher wordlists        # browser wordlist
-netlauncher wordlists refresh
-netlauncher update
-netlauncher tool <id>
-netlauncher recipe <nama>
+netlauncher                       # menu utama
+netlauncher search                # pencarian global tool & contoh perintah
+netlauncher examples [tool_id]    # browser contoh perintah & code snippets
+netlauncher snippets [tool_id]    # alias untuk examples
+netlauncher automation            # kelola & jalankan custom automation scripts
+netlauncher wordlists [refresh]   # browser / refresh wordlist
+netlauncher logs                  # viewer log sesi
+netlauncher theme [nama]          # ubah tema (cyber|tokyo|emerald|amber)
+netlauncher tool <id>             # jalankan tool langsung
+netlauncher recipe <nama>         # jalankan resep otomasi aman
+netlauncher list [--json]         # daftar tool (tabel atau JSON)
+netlauncher doctor                # cek dependensi & terminal
+netlauncher selftest              # validasi registry & snippet
+netlauncher lint                  # validasi ketat TSV & syntax
+netlauncher update                # update hackingtool + index wordlist
+netlauncher help                  # panduan lengkap
 netlauncher --version
+netlauncher --help
 ```
 
 ### Alias
@@ -236,17 +258,20 @@ Categories=Network;
 
 ---
 
-## 5. Resep Otomasi
+## 5. Resep Otomasi (10 Resep)
 
-Semua resep menampilkan perintah sebelum eksekusi dan menyimpan log.
+Semua resep menampilkan perintah sebelum eksekusi, mendukung `--dry-run`, dan menyimpan log.
 
 | Nama | Fungsi | Sudo |
 | --- | --- | --- |
-| `cek-koneksi` | Ping gateway/internet, DNS, HTTP | tidak |
-| `info-jaringan` | IP, route, `iw dev`, `ss`, resolver | tidak |
-| `scan-target` | `nmap -sV -T4 --top-ports 100` + konfirmasi otorisasi | tidak |
-| `capture` | `tcpdump` pada interface + durasi | ya |
-| `dns` | Query A, MX, NS, TXT | tidak |
+| `cek-koneksi` | Ping gateway/internet, DNS, HTTP timing | tidak |
+| `info-jaringan` | IP, subnet, route, `iw dev`, `ss`, resolver | tidak |
+| `audit-web` | HTTP security headers, timing, sertifikat TLS, DNS, WhatWeb | tidak |
+| `dns` | Query A, AAAA, MX, NS, TXT, SOA, DMARC, WHOIS | tidak |
+| `monitor-port` | Ringkasan socket, port listening, koneksi aktif, `lsof` | tidak |
+| `discovery-lokal` | Tabel ARP lokal + opsional ping sweep berizin | tidak |
+| `scan-target` | Nmap (Top 100 / Service+NSE / Full TCP) + konfirmasi otorisasi | tidak |
+| `capture` | `tcpdump` pada interface + filter BPF + durasi | ya |
 | `wordlist-stats` | Baris, ukuran, cuplikan, unik | tidak |
 | `laporan` | Gabungkan log 24 jam ke Markdown | tidak |
 
@@ -282,37 +307,19 @@ Batasan:
 - Regenerate: `netlauncher wordlists refresh`
 - Detail sumber, lisensi, dan SHA256: `~/wordlists/README.md`
 
-### Menambah wordlist
-
-1. Letakkan file di `~/wordlists/` atau subdirektori.
-2. Tambahkan entri ke `wordlist_refresh()` di script, atau edit `wordlists.tsv` manual.
-3. Jalankan `netlauncher wordlists refresh`.
-
 ---
 
 ## 7. Verifikasi yang Sudah Dilakukan
 
-- `bash -n bin/netlauncher` → OK
-- `make check` / `tests/smoke.sh` → lolos setelah restrukturisasi repo
-- Symlink live (`~/.local/bin/netlauncher`, `~/.config/netlauncher`, `~/NETLAUNCHER_MEMORY.md`) → resolve ke repo
-- `netlauncher selftest` → 35 entri, tanpa error
+- `make check` (`bash -n` semua script + `tests/smoke.sh`) → lolos
+- `netlauncher lint` → 51 tool unik, 104 snippet, 9 script syntax OK
+- `netlauncher selftest` → 51 entri & 104 snippet tanpa error
 - `netlauncher doctor` → komponen utama siap
-- UI tmux → menu utama, kategori, aksi tool, wordlist, preview tampil
-- Eksekusi `ping 127.0.0.1` via menu → exit 0
-- Browser wordlist → preview `rockyou` tampil
-- Resep `cek-koneksi` → berhasil, log dibuat
-- Resep `info-jaringan` → berhasil, log dibuat
-- Resep `laporan` → laporan Markdown dibuat
-- TUI `hackingtool` → berhasil terbuka
+- `netlauncher list --json` → JSON valid 51 entri
+- `make ui-test` & tmux capture → menu utama, kategori, `Ctrl-E` snippets, `Ctrl-S` global search, `Ctrl-T` tema + preview, `Ctrl-L` riwayat + preview tampil normal
+- `NETLAUNCHER_CONFIG_DIR` / `NETLAUNCHER_DATA_DIR` + `--dry-run` → terisolasi tanpa menyentuh data pengguna
+- Symlink live (`~/.local/bin/netlauncher`, `~/.config/netlauncher`, `~/NETLAUNCHER_MEMORY.md`) → resolve ke repo
 - `desktop-file-validate` → valid
-
-Artefak uji (boleh dihapus):
-
-- `~/.local/share/netlauncher/logs/20261117-160049-ping.log`
-- `~/.local/share/netlauncher/logs/20261117-160115-cek-koneksi.log`
-- `~/.local/share/netlauncher/logs/20261117-160205-info-jaringan.log`
-- `~/laporan/laporan-20261117-160115.md`
-- Entri riwayat uji di `history.log`
 
 ---
 
@@ -354,7 +361,8 @@ source ~/.zshrc
 
 ### Warna/UI tidak normal
 
-Pastikan `TERM` mendukung ANSI, misalnya `xterm-256color`.
+Pastikan `TERM` mendukung ANSI dan truecolor (`TERM=xterm-256color`, `COLORTERM=truecolor`).
+Untuk menonaktifkan animasi: `netlauncher --no-anim` atau ubah di menu `Tema & Animasi` (`Ctrl-T`).
 
 ---
 
@@ -363,14 +371,15 @@ Pastikan `TERM` mendukung ANSI, misalnya `xterm-256color`.
 ### Menambah tool baru
 
 1. Tambahkan baris 11-field ke `config/tools.tsv` di repo.
-2. Pastikan `binary` sesuai `command -v`.
-3. Jalankan `netlauncher selftest`.
-4. Uji preview: `netlauncher --preview-tool <id>`.
+2. Tambahkan contoh perintah ke `config/snippets.tsv`.
+3. Pastikan `binary` sesuai `command -v`.
+4. Jalankan `netlauncher lint` dan `netlauncher selftest`.
+5. Uji preview: `netlauncher --preview-tool <id>`.
 
 ### Menambah kategori
 
-1. Tambahkan nama di `CAT_NAMES` dan `CAT_DESC` pada script.
-2. Tambahkan entri menu di `main_menu()`.
+1. Tambahkan nama di `CAT_NAMES`, `CAT_ICONS`, dan `CAT_DESC` pada `lib/core.sh`.
+2. Tambahkan entri menu di `main_menu()` pada `lib/menu.sh`.
 3. Tambahkan tool dengan `category` yang sesuai di `tools.tsv`.
 
 ### Update hackingtool
@@ -391,33 +400,4 @@ pipx install ~/tools/hackingtool --force
 ```bash
 cd ~/tools/netlauncher
 make backup
-
-# atau manual:
-tar czf ~/netlauncher-backup-$(date +%F).tar.gz \
-  -C ~/tools netlauncher \
-  ~/.local/share/applications/netlauncher.desktop
 ```
-
-### Reset log/riwayat
-
-```bash
-rm -f ~/.local/share/netlauncher/logs/*.log
-: > ~/.local/share/netlauncher/history.log
-```
-
----
-
-## 10. Batasan Keamanan
-
-- Hanya untuk aset/jaringan milik sendiri atau dengan izin tertulis.
-- Launcher membuka tool yang sudah terpasang; tidak menambahkan otomasi serangan.
-- Tidak menyimpan kredensial atau password sudo.
-- Log dapat berisi data sensitif; disimpan dengan permission `600` di direktori `700`.
-- Wordlist password dapat berisi data nyata; jangan redistribusikan tanpa memeriksa lisensi.
-
----
-
-## 11. Changelog
-
-- **2026-11-17** — Restrukturisasi menjadi repo pengembangan di `~/tools/netlauncher` (`bin/`, `config/`, `docs/`, `tests/`, `scripts/`), tambah `AGENTS.md`, `README.md`, `MEMORY.md` kanonik, `Makefile`, dan symlink live. Backup konfigurasi lama: `~/.config/netlauncher.backup-20261117-160508`.
-- **2026-11-17** — Instalasi fzf lokal, hackingtool 3.1.0 via pipx, 3 wordlist Indonesia + rockyou/SecLists, launcher `netlauncher`, alias `net`, desktop entry, resep otomasi, dokumentasi memory ini.

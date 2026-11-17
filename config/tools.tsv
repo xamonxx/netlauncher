@@ -1,36 +1,52 @@
 # category|id|label|binary|template|description|help|sudo|arg_prompt|mode|examples
-diagnostik|ping|Ping|ping|ping -c 4 %s|Uji jangkauan host via ICMP.|ping -h|0|Host/target|term|ping -c 4 1.1.1.1
-diagnostik|traceroute|Traceroute|traceroute|traceroute %s|Lacak rute paket ke host.|traceroute -h|0|Host/target|term|traceroute example.com
-diagnostik|curl|Curl|curl|curl -I %s|Cek header HTTP/HTTPS.|curl --help|0|URL|term|curl -I https://example.com
-diagnostik|wget|Wget|wget|wget --spider -S %s|Cek ketersediaan URL atau file.|wget --help|0|URL|term|wget --spider -S https://example.com
-dns|dig|Dig|dig|dig %s|Query DNS (A, MX, NS, TXT).|dig -h|0|Domain|term|dig +short A example.com
-dns|nslookup|Nslookup|nslookup|nslookup %s|Query DNS interaktif.|man nslookup|0|Domain|term|nslookup example.com
-dns|whatweb|WhatWeb|whatweb|whatweb %s|Fingerprint teknologi web.|whatweb --help|0|URL|term|whatweb https://example.com
-dns|nikto|Nikto|nikto|nikto -h %s|Scan kerentanan web (target berizin).|nikto -help|0|URL|term|nikto -h https://example.com
-dns|gobuster|Gobuster|gobuster||Enumerasi direktori atau DNS (berizin).|gobuster --help|0||term|gobuster --help
-dns|ffuf|FFUF|ffuf||Fuzzing web (target berizin).|ffuf -h|0||term|ffuf -h
-dns|httpx|HTTPX|httpx||Probe HTTP/HTTPS.|httpx -h|0||term|httpx -h
-dns|nuclei|Nuclei|nuclei||Scan template kerentanan (berizin).|nuclei -h|0||term|nuclei -h
-dns|amass|Amass|amass||OSINT dan enumerasi subdomain (berizin).|amass -h|0||term|amass -h
-dns|sqlmap|SQLMap|sqlmap||Deteksi SQL injection (target berizin).|sqlmap -h|0||term|sqlmap -h
-dns|searchsploit|SearchSploit|searchsploit|searchsploit %s|Cari exploit lokal di Exploit-DB.|searchsploit -h|0|Kata kunci|term|searchsploit apache
+diagnostik|ping|Ping|ping|ping -c 4 %s|Uji jangkauan host dan latensi via ICMP.|ping -h|0|Host/target|term|ping -c 4 1.1.1.1
+diagnostik|traceroute|Traceroute|traceroute|traceroute %s|Lacak rute hop paket menuju host.|traceroute -h|0|Host/target|term|traceroute example.com
+diagnostik|curl|Curl|curl|curl -ILsS %s|Cek header HTTP/HTTPS, redirect, dan timing.|curl --help|0|URL|term|curl -ILsS https://example.com
+diagnostik|wget|Wget|wget|wget --spider -S %s|Cek ketersediaan URL atau unduh file.|wget --help|0|URL|term|wget --spider -S https://example.com
+diagnostik|whois|Whois|whois|whois %s|Cek informasi registrasi domain, ASN, dan IP.|whois --help|0|Domain/IP|term|whois example.com
+diagnostik|openssl|OpenSSL TLS|openssl|openssl s_client -connect %s:443 </dev/null|Inspeksi sertifikat TLS/SSL dan cipher server.|openssl help|0|Domain/host|term|openssl s_client -connect example.com:443 -servername example.com </dev/null
+diagnostik|nc|Netcat|nc|nc -zv %s|Uji koneksi port TCP/UDP dan banner service.|nc -h|0|Host dan port (mis. 127.0.0.1 80)|term|nc -zv 127.0.0.1 22-80
+diagnostik|socat|Socat|socat|socat -h|Relay data dan diagnostik socket serbaguna.|socat -h|0||term|socat - TCP:127.0.0.1:80
+dns|dig|Dig|dig|dig %s|Query DNS lengkap (A, AAAA, MX, NS, TXT).|dig -h|0|Domain|term|dig +short A example.com
+dns|nslookup|Nslookup|nslookup|nslookup %s|Query DNS interaktif dan cek resolver.|man nslookup|0|Domain|term|nslookup example.com
+dns|whatweb|WhatWeb|whatweb|whatweb %s|Fingerprint teknologi web, CMS, dan server.|whatweb --help|0|URL|term|whatweb https://example.com
+dns|nikto|Nikto|nikto|nikto -h %s|Scan konfigurasi dan kerentanan web (berizin).|nikto -help|0|URL|term|nikto -h https://example.com
+dns|gobuster|Gobuster|gobuster||Enumerasi direktori, vhost, atau DNS (berizin).|gobuster --help|0||term|gobuster dir -u http://127.0.0.1 -w ~/wordlists/indonesian/geovedi/00-indonesian-wordlist.lst
+dns|ffuf|FFUF|ffuf||Fuzzing web cepat untuk direktori/parameter (berizin).|ffuf -h|0||term|ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt
+dns|feroxbuster|Feroxbuster|feroxbuster||Enumerasi konten web rekursif cepat (berizin).|feroxbuster --help|0||term|feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+dns|dirb|Dirb|dirb||Scanner direktori web berbasis wordlist (berizin).|dirb|0||term|dirb http://127.0.0.1 /usr/share/dirb/wordlists/common.txt
+dns|wfuzz|Wfuzz|wfuzz||Web fuzzer fleksibel untuk audit aplikasi (berizin).|wfuzz --help|0||term|wfuzz -c -z file,/usr/share/dirb/wordlists/common.txt --hc 404 http://127.0.0.1/FUZZ
+dns|httpx|HTTPX|httpx||Probe HTTP/HTTPS massal, status, dan title.|httpx -h|0||term|httpx -u https://example.com -status-code -title -tech-detect
+dns|nuclei|Nuclei|nuclei||Scan kerentanan berbasis template YAML (berizin).|nuclei -h|0||term|nuclei -u https://example.com -severity medium,high,critical
+dns|amass|Amass|amass||OSINT dan pemetaan subdomain (target berizin).|amass -h|0||term|amass enum -passive -d example.com
+dns|sqlmap|SQLMap|sqlmap||Audit dan deteksi SQL injection (target berizin).|sqlmap -h|0||term|sqlmap -u "http://127.0.0.1/item?id=1" --batch --banner
+dns|searchsploit|SearchSploit|searchsploit|searchsploit %s|Cari referensi exploit lokal di Exploit-DB.|searchsploit -h|0|Kata kunci|term|searchsploit apache 2.4
 interface|ip-addr|IP Address|ip|ip -brief addr|Tampilkan alamat IP dan status interface.|man ip|0||term|ip -brief addr
-interface|ip-route|IP Route|ip|ip route|Tampilkan tabel routing.|man ip|0||term|ip route
-interface|ss|Socket Stat|ss|ss -tulpn|Tampilkan socket dan port listening.|man ss|0||term|ss -tulpn
-interface|netstat|Netstat|netstat|netstat -tulpn|Tampilkan koneksi dan port listening.|man netstat|0||term|netstat -tulpn
-interface|iw-dev|IW Dev|iw|iw dev|Tampilkan antarmuka wireless.|man iw|0||term|iw dev
-scan|nmap|Nmap|nmap|nmap -sV -T4 %s|Scan port dan layanan (target berizin).|nmap -h|0|Target berizin|term|nmap -sV -T4 127.0.0.1
-scan|tcpdump|Tcpdump|tcpdump|sudo tcpdump -i %s|Capture paket pada interface (butuh sudo).|tcpdump -h|1|Interface|term|sudo tcpdump -i eth0
-scan|wireshark|Wireshark|wireshark|wireshark|GUI analisis paket (butuh display).|wireshark --help|0||gui|wireshark
-wireless|airmon-ng|Airmon-ng|airmon-ng|sudo airmon-ng|Lihat dan kelola antarmuka monitor.|airmon-ng --help|1||term|sudo airmon-ng
-wireless|aircrack-ng|Aircrack-ng|aircrack-ng|sudo aircrack-ng|Suite audit WiFi (jaringan berizin).|aircrack-ng --help|1||term|sudo aircrack-ng
-wireless|kismet|Kismet|kismet|sudo kismet|Deteksi wireless dan WIDS (berizin).|kismet --help|1||term|sudo kismet
-wireless|reaver|Reaver|reaver|sudo reaver|Tool WPS untuk audit berizin.|reaver --help|1||term|sudo reaver
-wireless|wifite|Wifite|wifite|sudo wifite|Otomasi audit WiFi (jaringan berizin).|wifite --help|1||term|sudo wifite
-security|hydra|Hydra|hydra|hydra|Audit kredensial (target berizin).|hydra -h|0||term|hydra -h
-security|john|John the Ripper|john|john|Audit hash dan kata sandi (berizin).|john --help|0||term|john --help
-security|hashcat|Hashcat|hashcat|hashcat|Audit hash dan kata sandi (berizin).|hashcat --help|0||term|hashcat --help
-security|msfconsole|Metasploit Console|msfconsole|msfconsole|Konsol Metasploit Framework.|msfconsole --help|0||term|msfconsole
+interface|ip-route|IP Route|ip|ip route|Tampilkan tabel routing dan gateway default.|man ip|0||term|ip route
+interface|ss|Socket Stat|ss|ss -tulpn|Tampilkan socket TCP/UDP dan port listening.|man ss|0||term|ss -tulpn
+interface|netstat|Netstat|netstat|netstat -tulpn|Tampilkan koneksi aktif dan port listening.|man netstat|0||term|netstat -tulpn
+interface|iw-dev|IW Dev|iw|iw dev|Tampilkan antarmuka wireless dan mode link.|man iw|0||term|iw dev
+interface|nmcli|NMCLI|nmcli|nmcli device status|Status perangkat dan profil NetworkManager.|nmcli --help|0||term|nmcli device status
+interface|ethtool|Ethtool|ethtool|ethtool %s|Info driver, kecepatan link, dan fitur NIC.|ethtool --help|0|Interface|term|ethtool eth0
+interface|lsof|LSOF Network|lsof|lsof -i -P -n|Daftar proses yang membuka koneksi/port jaringan.|lsof -h|0||term|lsof -i -P -n
+scan|nmap|Nmap|nmap|nmap -sV -T4 %s|Scan port, layanan, dan versi (target berizin).|nmap -h|0|Target berizin|term|nmap -sV -T4 127.0.0.1
+scan|masscan|Masscan|masscan|sudo masscan --help|Scanner port TCP berkecepatan tinggi (berizin).|masscan --help|1||term|sudo masscan 127.0.0.1 -p80,443 --rate=1000
+scan|arp-scan|ARP Scan|arp-scan|sudo arp-scan --localnet|Discovery host LAN via ARP (jaringan berizin).|arp-scan --help|1||term|sudo arp-scan --localnet
+scan|netdiscover|Netdiscover|netdiscover|sudo netdiscover -P -r %s|Pemetaan host ARP aktif/pasif di LAN (berizin).|netdiscover -h|1|Subnet CIDR|term|sudo netdiscover -P -r 192.168.1.0/24
+scan|tcpdump|Tcpdump|tcpdump|sudo tcpdump -i %s -c 50 -nn|Capture paket pada interface (butuh sudo).|tcpdump -h|1|Interface|term|sudo tcpdump -i wlan0 -c 50 -nn
+scan|tshark|TShark|tshark|sudo tshark -i %s -c 25|Analisis paket CLI dari Wireshark (butuh sudo).|tshark -h|1|Interface|term|sudo tshark -i wlan0 -c 25
+scan|tcpflow|TCPFlow|tcpflow|sudo tcpflow -i %s -c|Rekonstruksi aliran data TCP (butuh sudo).|tcpflow -h|1|Interface|term|sudo tcpflow -i wlan0 -c port 80
+scan|ngrep|Ngrep|ngrep|sudo ngrep -d %s -q|Pencarian pola teks pada paket jaringan (sudo).|ngrep -h|1|Interface|term|sudo ngrep -d wlan0 -q 'HTTP' port 80
+scan|wireshark|Wireshark|wireshark|wireshark|GUI analisis paket mendalam (butuh display).|wireshark --help|0||gui|wireshark
+wireless|airmon-ng|Airmon-ng|airmon-ng|sudo airmon-ng|Lihat dan kelola antarmuka monitor wireless.|airmon-ng --help|1||term|sudo airmon-ng
+wireless|aircrack-ng|Aircrack-ng|aircrack-ng|sudo aircrack-ng|Suite audit keamanan WiFi (jaringan berizin).|aircrack-ng --help|1||term|sudo aircrack-ng --help
+wireless|kismet|Kismet|kismet|sudo kismet|Deteksi wireless, spektrum, dan WIDS (berizin).|kismet --help|1||term|sudo kismet
+wireless|reaver|Reaver|reaver|sudo reaver|Tool audit WPS pada jaringan berizin.|reaver --help|1||term|sudo reaver --help
+wireless|wifite|Wifite|wifite|sudo wifite|Audit WiFi terpandu (hanya jaringan berizin).|wifite --help|1||term|sudo wifite --help
+security|hydra|Hydra|hydra|hydra|Audit kekuatan kredensial layanan (berizin).|hydra -h|0||term|hydra -h
+security|john|John the Ripper|john|john|Audit kekuatan hash dan kata sandi (berizin).|john --help|0||term|john --test
+security|hashcat|Hashcat|hashcat|hashcat|Audit hash berakselerasi GPU/CPU (berizin).|hashcat --help|0||term|hashcat -b
+security|msfconsole|Metasploit Console|msfconsole|msfconsole|Konsol Metasploit Framework (pengujian berizin).|msfconsole --help|0||term|msfconsole -q
 hackingtool|hackingtool|Hackingtool TUI|hackingtool|hackingtool|TUI utama hackingtool (219 tool, 21 kategori).|hackingtool --help|0||term|hackingtool
 hackingtool|hackingtool-classic|Hackingtool Classic|hackingtool|hackingtool --classic|REPL klasik hackingtool.|hackingtool --help|0||term|hackingtool --classic
 hackingtool|hackingtool-help|Hackingtool Help|hackingtool|hackingtool --help|Bantuan CLI hackingtool.|hackingtool --help|0||term|hackingtool --help

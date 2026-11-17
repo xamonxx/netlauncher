@@ -1,0 +1,105 @@
+# tool_id	title	command	notes	sudo	placeholders
+ping	Ping cepat 4 paket	ping -c 4 {TARGET}	Uji konektivitas dasar dan latensi RTT ke host.	0	TARGET
+ping	Ping interval cepat (10 paket)	ping -c 10 -i 0.2 {TARGET}	Cek packet loss dan jitter lebih cepat.	0	TARGET
+ping	Ping dengan timestamp	ping -D -c 5 {TARGET}	Tampilkan timestamp UNIX di setiap balasan ICMP.	0	TARGET
+traceroute	Traceroute standar	traceroute {TARGET}	Lacak hop router menuju target.	0	TARGET
+traceroute	Traceroute tanpa DNS lookup (cepat)	traceroute -n {TARGET}	Tampilkan IP hop langsung tanpa delay reverse DNS.	0	TARGET
+traceroute	Traceroute TCP port 443	sudo traceroute -T -p 443 {TARGET}	Berguna saat ICMP diblokir firewall.	1	TARGET
+curl	Cek header & ikuti redirect	curl -ILsS --max-time 10 {URL}	Lihat status HTTP, server, dan rantai redirect.	0	URL
+curl	Benchmark timing HTTP/TLS	curl -o /dev/null -s -w 'DNS: %{time_namelookup}s\nConnect: %{time_connect}s\nTLS: %{time_appconnect}s\nTTFB: %{time_starttransfer}s\nTotal: %{time_total}s\nHTTP: %{http_code}\n' {URL}	Ukur waktu DNS, TCP, TLS handshake, dan TTFB.	0	URL
+curl	Audit security headers HTTP	curl -sI --max-time 10 {URL} | grep -iE '^(http/|strict-transport|content-security|x-frame|x-content-type|referrer-policy|permissions-policy)'	Periksa header keamanan utama pada respons web.	0	URL
+curl	Cek IP publik keluar	curl -sS --max-time 5 https://ifconfig.me && echo	Tampilkan IP publik koneksi saat ini.	0	
+wget	Cek ketersediaan URL (spider)	wget --spider -S --timeout=10 {URL}	Verifikasi URL aktif dan lihat header tanpa mengunduh isi.	0	URL
+wget	Mirror halaman tunggal untuk arsip	wget -p -k --no-parent --timeout=15 {URL}	Unduh halaman beserta aset lokalnya.	0	URL
+whois	Lookup WHOIS domain/IP	whois {DOMAIN}	Lihat registrar, tanggal kedaluwarsa, dan nameserver.	0	DOMAIN
+whois	Ringkasan WHOIS penting	whois {DOMAIN} | grep -iE 'domain name|registrar|creation|expir|name server|org|country' | head -n 25	Saring baris penting dari output WHOIS.	0	DOMAIN
+openssl	Cek masa berlaku sertifikat TLS	echo | openssl s_client -servername {DOMAIN} -connect {DOMAIN}:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates	Periksa CN, penerbit, dan tanggal kedaluwarsa sertifikat.	0	DOMAIN
+openssl	Cek SAN (Subject Alternative Name)	echo | openssl s_client -servername {DOMAIN} -connect {DOMAIN}:443 2>/dev/null | openssl x509 -noout -ext subjectAltName	Lihat semua domain yang tercakup sertifikat TLS.	0	DOMAIN
+openssl	Cek protokol & cipher TLS aktif	openssl s_client -connect {DOMAIN}:443 -servername {DOMAIN} </dev/null 2>/dev/null | grep -E 'Protocol|Cipher|Verify return code'	Verifikasi versi TLS dan cipher yang dinegosiasikan.	0	DOMAIN
+nc	Uji port TCP terbuka	nc -zv -w 3 {TARGET} {PORT}	Cek apakah port TCP tertentu menerima koneksi.	0	TARGET,PORT
+nc	Scan rentang port TCP ringan	nc -zv -w 2 {TARGET} 20-25 80 443 8080	Uji beberapa port umum tanpa Nmap.	0	TARGET
+socat	Uji koneksi TCP interaktif	socat - TCP:{TARGET}:{PORT},connect-timeout=5	Buka koneksi TCP mentah ke host dan port.	0	TARGET,PORT
+socat	Cek versi dan fitur socat	socat -V | head -n 20	Lihat dukungan OpenSSL, IPv6, dan opsi kompilasi.	0	
+dig	Query semua record DNS utama	dig +noall +answer {DOMAIN} A {DOMAIN} AAAA {DOMAIN} MX {DOMAIN} NS {DOMAIN} TXT	Tampilkan record A, AAAA, MX, NS, dan TXT sekaligus.	0	DOMAIN
+dig	Cek SPF & DMARC domain	dig +short TXT {DOMAIN} && dig +short TXT _dmarc.{DOMAIN}	Audit konfigurasi autentikasi email SPF dan DMARC.	0	DOMAIN
+dig	Trace resolusi DNS dari root	dig +trace {DOMAIN}	Lacak delegasi DNS dari root server hingga authoritative.	0	DOMAIN
+dig	Reverse DNS lookup (PTR)	dig -x {TARGET} +short	Cari hostname dari alamat IP.	0	TARGET
+nslookup	Query DNS standar	nslookup {DOMAIN}	Cek resolusi DNS menggunakan resolver sistem.	0	DOMAIN
+nslookup	Query MX via resolver 1.1.1.1	nslookup -type=MX {DOMAIN} 1.1.1.1	Bandingkan hasil MX menggunakan DNS Cloudflare.	0	DOMAIN
+whatweb	Fingerprint teknologi web	whatweb -v {URL}	Identifikasi server, framework, CMS, dan header.	0	URL
+whatweb	Fingerprint cepat agresif level 1	whatweb -a 1 {URL}	Mode pasif/ringan untuk inventaris teknologi.	0	URL
+nikto	Audit konfigurasi web (berizin)	nikto -h {URL} -Tuning 123b	Cek misconfiguration dan header pada target berizin.	0	URL
+nikto	Audit web + simpan laporan HTML	nikto -h {URL} -o {REPORT_DIR}/nikto-{DATE}.html -Format htm	Simpan hasil audit Nikto ke folder laporan.	0	URL
+gobuster	Enumerasi direktori web (berizin)	gobuster dir -u {URL} -w {WORDLIST} -t 20 -k	Cari path direktori dengan wordlist pilihan.	0	URL,WORDLIST
+gobuster	Enumerasi subdomain DNS (berizin)	gobuster dns --domain {DOMAIN} -w {WORDLIST} -t 20	Cari subdomain menggunakan wordlist DNS.	0	DOMAIN,WORDLIST
+ffuf	Fuzzing direktori web (berizin)	ffuf -u {URL}/FUZZ -w {WORDLIST} -mc 200,204,301,302,307,403 -t 25	Fuzzing path cepat dengan filter status HTTP.	0	URL,WORDLIST
+ffuf	Fuzzing vhost dengan header Host	ffuf -u {URL} -H 'Host: FUZZ.{DOMAIN}' -w {WORDLIST} -fs 0	Temukan virtual host pada server berizin.	0	URL,DOMAIN,WORDLIST
+feroxbuster	Scan konten web rekursif (berizin)	feroxbuster -u {URL} -w {WORDLIST} -t 20 --depth 2 --no-state	Enumerasi direktori rekursif dengan kedalaman 2.	0	URL,WORDLIST
+dirb	Scan direktori standar (berizin)	dirb {URL} {WORDLIST} -S	Scan direktori klasik dengan output ringkas.	0	URL,WORDLIST
+wfuzz	Fuzzing direktori berwarna (berizin)	wfuzz -c -z file,{WORDLIST} --hc 404 {URL}/FUZZ	Sembunyikan 404 dan tampilkan respons valid.	0	URL,WORDLIST
+httpx	Probe URL + status + title + tech	printf '%s\n' {URL} | httpx -status-code -title -tech-detect -ip -cdn	Cek status HTTP, judul halaman, teknologi, dan IP.	0	URL
+httpx	Probe daftar domain dari file	httpx -l {FILE} -status-code -title -follow-redirects -silent	Uji banyak host dari file teks (satu domain per baris).	0	FILE
+nuclei	Scan template misconfig & exposure (berizin)	nuclei -u {URL} -tags misconfig,exposure -severity low,medium,high	Jalankan template audit konfigurasi pada target berizin.	0	URL
+nuclei	Update template Nuclei	nuclei -update-templates	Perbarui koleksi template Nuclei resmi.	0	
+amass	Enumerasi subdomain pasif (berizin)	amass enum -passive -d {DOMAIN}	Kumpulkan subdomain dari sumber pasif tanpa menyentuh target.	0	DOMAIN
+sqlmap	Cek parameter URL (target berizin)	sqlmap -u {URL} --batch --level=1 --risk=1 --banner	Uji dasar parameter GET pada aplikasi berizin.	0	URL
+sqlmap	Audit dari file request HTTP	sqlmap -r {FILE} --batch --current-db	Gunakan raw HTTP request yang disimpan dari proxy.	0	FILE
+searchsploit	Cari exploit berdasarkan kata kunci	searchsploit {QUERY}	Cari entri Exploit-DB lokal secara offline.	0	QUERY
+searchsploit	Cari CVE spesifik	searchsploit --cve {QUERY}	Cari exploit berdasarkan nomor CVE (mis. 2024-1234).	0	QUERY
+ip-addr	Ringkasan IP semua interface	ip -c -brief addr	Tampilkan status UP/DOWN dan alamat IP berwarna.	0	
+ip-addr	Detail statistik paket & error interface	ip -s link show	Cek RX/TX bytes, dropped packets, dan error.	0	
+ip-addr	Tabel tetangga ARP/NDP lokal	ip neigh show	Lihat perangkat di segmen LAN yang sudah dikenal kernel.	0	
+ip-route	Tabel routing lengkap	ip -c route show	Lihat default gateway dan rute subnet.	0	
+ip-route	Cek rute menuju target tertentu	ip route get {TARGET}	Lihat interface dan gateway yang dipakai ke target.	0	TARGET
+ss	Port listening TCP & UDP + proses	ss -tulpn	Tampilkan semua port yang sedang listen beserta PID.	0	
+ss	Koneksi TCP aktif (ESTABLISHED)	ss -tunap state established	Pantau koneksi keluar/masuk yang sedang aktif.	0	
+ss	Ringkasan statistik socket	ss -s	Lihat total socket TCP, UDP, RAW, dan state.	0	
+netstat	Port listening & program	netstat -tulpn	Tampilan klasik port listening dan PID.	0	
+iw-dev	Info antarmuka wireless & link	iw dev && iw dev {IFACE} link	Lihat mode interface WiFi, SSID, frekuensi, dan bitrate.	0	IFACE
+iw-dev	Scan SSID sekitar (butuh sudo)	sudo iw dev {IFACE} scan | grep -E 'BSS |SSID:|signal:|freq:'	Daftar access point sekitar beserta kekuatan sinyal.	1	IFACE
+nmcli	Status perangkat NetworkManager	nmcli device status	Lihat status koneksi semua adapter jaringan.	0	
+nmcli	Daftar WiFi sekitar via nmcli	nmcli device wifi list	Tampilkan SSID, channel, rate, sinyal, dan keamanan.	0	
+ethtool	Info link & kecepatan NIC	ethtool {IFACE}	Cek link detected, speed, duplex, dan auto-negotiation.	0	IFACE
+ethtool	Info driver & firmware NIC	ethtool -i {IFACE}	Lihat nama driver kernel dan versi firmware.	0	IFACE
+lsof	Semua socket jaringan terbuka	lsof -i -P -n	Lihat proses, user, protokol, dan endpoint koneksi.	0	
+lsof	Cek proses pada port tertentu	lsof -i :{PORT} -P -n	Temukan proses yang memakai port spesifik.	0	PORT
+nmap	Scan cepat Top 100 port + versi	nmap -sV -T4 --top-ports 100 {TARGET}	Audit cepat layanan paling umum pada target berizin.	0	TARGET
+nmap	Host discovery subnet lokal (Ping Sweep)	nmap -sn {SUBNET}	Temukan host aktif di subnet lokal tanpa port scan.	0	SUBNET
+nmap	Audit service + default NSE scripts	nmap -sC -sV -T4 {TARGET}	Deteksi versi layanan dan jalankan script aman bawaan.	0	TARGET
+nmap	Full TCP port scan (target berizin)	nmap -p- -T4 --min-rate 1000 {TARGET}	Periksa seluruh 65535 port TCP pada target berizin.	0	TARGET
+nmap	Scan + simpan laporan ke ~/laporan	nmap -sC -sV -T4 -oN {REPORT_DIR}/nmap-{DATE}.txt {TARGET}	Simpan hasil scan Nmap langsung ke folder laporan.	0	TARGET
+masscan	Scan port cepat subnet/target (berizin)	sudo masscan {TARGET} -p80,443,22,8080 --rate=1000	Scan port TCP berkecepatan tinggi dengan rate terkontrol.	1	TARGET
+arp-scan	Discovery perangkat LAN lokal	sudo arp-scan --localnet	Identifikasi IP, MAC, dan vendor perangkat di LAN berizin.	1	
+arp-scan	ARP scan pada interface spesifik	sudo arp-scan -I {IFACE} --localnet	Pilih interface tertentu untuk discovery ARP.	1	IFACE
+netdiscover	Discovery ARP pasif (tanpa kirim paket)	sudo netdiscover -i {IFACE} -p	Dengarkan trafik ARP secara pasif di jaringan lokal.	1	IFACE
+netdiscover	Discovery ARP aktif pada subnet	sudo netdiscover -i {IFACE} -P -r {SUBNET}	Pindai subnet lokal dan cetak tabel host.	1	IFACE,SUBNET
+tcpdump	Capture ringkas 50 paket	sudo tcpdump -i {IFACE} -c 50 -nn	Lihat 50 paket pertama tanpa resolusi DNS.	1	IFACE
+tcpdump	Monitor trafik DNS & HTTP/HTTPS	sudo tcpdump -i {IFACE} -nn -c 100 'port 53 or port 80 or port 443'	Saring hanya paket DNS dan web.	1	IFACE
+tcpdump	Capture ke file PCAP (30 detik)	sudo timeout 30 tcpdump -i {IFACE} -w ~/capture-{DATE}.pcap	Rekam paket selama 30 detik untuk analisis Wireshark.	1	IFACE
+tcpdump	Baca isi file PCAP	tcpdump -nn -r {FILE} | head -n 50	Inspeksi cepat paket dari file PCAP yang sudah ada.	0	FILE
+tshark	Capture ringkas 25 paket	sudo tshark -i {IFACE} -c 25	Tampilkan ringkasan paket real-time di terminal.	1	IFACE
+tshark	Pantau query DNS real-time	sudo tshark -i {IFACE} -Y 'dns.qry.name' -T fields -e ip.src -e dns.qry.name	Ekstrak IP sumber dan domain yang di-query.	1	IFACE
+tshark	Statistik hierarki protokol PCAP	tshark -r {FILE} -q -z io,phs	Analisis distribusi protokol dari file PCAP.	0	FILE
+tcpflow	Rekonstruksi aliran HTTP port 80	sudo tcpflow -i {IFACE} -c port 80	Tampilkan payload aliran TCP secara berurutan.	1	IFACE
+ngrep	Cari pola HTTP GET/POST di interface	sudo ngrep -d {IFACE} -q -W byline '^(GET|POST|HTTP/)' port 80	Pantau header HTTP plaintext di jaringan lokal.	1	IFACE
+wireshark	Buka Wireshark GUI	wireshark	Jalankan antarmuka grafis Wireshark.	0	
+wireshark	Buka file PCAP di Wireshark	wireshark {FILE}	Analisis file capture PCAP di GUI.	0	FILE
+airmon-ng	Cek status interface wireless	sudo airmon-ng	Lihat adapter wireless dan driver yang terdeteksi.	1	
+airmon-ng	Cek proses yang mengganggu monitor mode	sudo airmon-ng check	Identifikasi proses seperti NetworkManager/wpa_supplicant.	1	
+aircrack-ng	Tampilkan bantuan & opsi aircrack-ng	aircrack-ng --help	Lihat dokumentasi opsi audit WiFi berizin.	0	
+aircrack-ng	Benchmark kecepatan CPU aircrack-ng	aircrack-ng -S	Uji performa pemrosesan kunci per detik di mesin lokal.	0	
+kismet	Jalankan Kismet server/UI (berizin)	sudo kismet	Deteksi wireless, spektrum, dan WIDS pada jaringan berizin.	1	
+reaver	Tampilkan bantuan Reaver	reaver --help	Lihat opsi audit WPS untuk jaringan berizin.	0	
+wifite	Tampilkan bantuan Wifite	wifite --help	Lihat opsi audit WiFi terpandu untuk jaringan berizin.	0	
+hydra	Tampilkan bantuan & modul Hydra	hydra -h | head -n 45	Lihat protokol yang didukung untuk audit kredensial berizin.	0	
+hydra	Cek daftar layanan yang didukung Hydra	hydra -U ssh	Lihat opsi spesifik modul layanan (mis. ssh).	0	
+john	Benchmark performa John the Ripper	john --test	Uji kecepatan hashing lokal di CPU.	0	
+john	Lihat format hash yang didukung John	john --list=formats | head -n 30	Daftar algoritma hash yang dikenali John.	0	
+john	Audit file hash lokal dengan wordlist	john --wordlist={WORDLIST} {FILE}	Uji kekuatan hash lokal milik sendiri dengan wordlist.	0	WORDLIST,FILE
+hashcat	Benchmark performa Hashcat	hashcat -b	Uji kecepatan GPU/CPU lokal untuk berbagai tipe hash.	0	
+hashcat	Lihat daftar perangkat OpenCL/CUDA	hashcat -I	Periksa perangkat komputasi yang terdeteksi Hashcat.	0	
+msfconsole	Buka Metasploit Console (quiet)	msfconsole -q	Masuk ke konsol Metasploit tanpa banner panjang.	0	
+msfconsole	Cek versi & status database Metasploit	msfconsole -q -x 'version; db_status; exit'	Verifikasi versi MSF dan koneksi database.	0	
+hackingtool	Buka Hackingtool TUI modern	hackingtool	Jalankan antarmuka TUI utama (219 tool, 21 kategori).	0	
+hackingtool	Buka Hackingtool Classic REPL	hackingtool --classic	Jalankan mode REPL klasik.	0	
+hackingtool-help	Lihat opsi headless orchestrator	hackingtool --help	Tampilkan opsi CLI headless dan laporan.	0	

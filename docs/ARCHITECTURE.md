@@ -5,7 +5,7 @@
 ```text
 +-------------------+       +---------------------+       +------------------+
 | Pengguna (terminal)| ----> | bin/netlauncher     | ----> | Tool sistem      |
-| fzf / CLI         |       | Bash + fzf          |       | ping, nmap, dll. |
+| fzf 0.75 / CLI    |       | + lib/*.sh (8 modul)|       | ping, nmap, dll. |
 +-------------------+       +----------+----------+       +------------------+
                                      |
                      +---------------+----------------+
@@ -13,8 +13,11 @@
              +-------v--------+               +-------v---------+
              | config/        |               | data runtime    |
              | tools.tsv      |               | logs/, history  |
-             | help.md        |               | ~/.local/share  |
-             | wordlists.tsv  |               +-----------------+
+             | snippets.tsv   |               | targets.history |
+             | automations/   |               | ~/.local/share  |
+             | help.md        |               +-----------------+
+             | wordlists.tsv  |
+             | theme.env      |
              +----------------+
 ```
 
@@ -33,59 +36,86 @@ Sumber kanonik berada di `~/tools/netlauncher/`. Lokasi live adalah symlink:
 
 Runtime data tetap di luar repo:
 
-- `~/.local/share/netlauncher/logs/`
+- `~/.local/share/netlauncher/logs/` (rotasi otomatis > 30 hari)
 - `~/.local/share/netlauncher/history.log`
+- `~/.local/share/netlauncher/targets.history`
 - `~/.cache/netlauncher/`
+
+## Struktur Modul (`lib/`)
+
+| Modul | Tanggung Jawab |
+| --- | --- |
+| `bin/netlauncher` | Entrypoint CLI, parsing flag (`--no-anim`, `--dry-run`, `--theme`), dispatch subcommand & preview, `main_menu_loop()` |
+| `lib/core.sh` | Path & env override (`NETLAUNCHER_CONFIG_DIR`, `NETLAUNCHER_DATA_DIR`, `NETLAUNCHER_REPORT_DIR`), kategori, helper output, clipboard, registry lookup, favorit, `record_target_history()` |
+| `lib/ui.sh` | 4 tema truecolor (`cyber`, `tokyo`, `emerald`, `amber`), `ui_splash()`, `ui_progress()`, `ui_spin()`, `ui_card_header()`, `ui_badge()`, `ui_fzf()`, `theme_menu()`, `preview_theme()` |
+| `lib/smart.sh` | `smart_net_context()`, `smart_prompt_placeholder()`, `smart_resolve_template()`, `smart_command_builder()`, `smart_missing_advisor()` |
+| `lib/snippets.sh` | `snippets_menu()`, `preview_snippet()`, `snippet_action_menu()`, `snippet_save_automation()` |
+| `lib/wordlists.sh` | `wordlist_refresh()`, `wordlist_menu()`, `preview_wordlist()`, `wordlist_action_menu()`, `wordlist_stats()` |
+| `lib/recipes.sh` | 10 fungsi `recipe_*()`, `preview_recipe()`, `recipes_menu()`, `run_recipe()`, `automation_menu()`, `automation_create()`, `preview_automation()` |
+| `lib/menu.sh` | `main_header()`, `main_menu()`, `global_search_menu()`, `category_menu()`, `tool_action_menu()`, `execute_command()`, `favorites_menu()`, `logs_menu()`, `history_menu()`, `preview_*()` |
+| `lib/doctor.sh` | `doctor()`, `selftest()`, `lint()`, `list_tools()` (`--json`), `do_update()`, `show_help()`, `print_cli_help()` |
 
 ## Alur eksekusi
 
 ```text
 main()
-├── ensure_dirs()
+├── parse global flags (--no-anim, --dry-run, --theme)
+├── ensure_dirs() + load_theme()
 ├── tanpa argumen → require_fzf() → main_menu_loop()
-│   ├── main_menu()            fzf, output: id kategori/aksi
-│   ├── category_menu()        fzf, output: id tool
-│   ├── tool_action_menu()     run | args | help | examples | fav
-│   ├── run_tool()/run_tool_args()
-│   │   └── execute_command()  log + eval perintah + pause
+│   ├── ui_splash()            animasi ASCII + progress bar (sekali per sesi)
+│   ├── main_menu()            fzf full:rounded + shortcut (^S, ^E, ^T, ^L)
+│   ├── global_search_menu()   pencarian lintas 51 tool + 104 snippet
+│   ├── snippets_menu()        browser & runner contoh perintah
+│   ├── automation_menu()      kelola & jalankan script di config/automations/
+│   ├── category_menu()        daftar tool per kategori
+│   ├── tool_action_menu()     run | builder | snippets | args | help | examples | fav
+│   ├── smart_command_builder() preset + smart fill + edit + run/copy/dry-run
+│   ├── execute_command()      log + eval/GUI + durasi + pause
 │   ├── favorites_menu()
-│   ├── history_menu()
+│   ├── history_menu()         riwayat + logs_menu()
 │   ├── wordlist_menu()        wordlist_action_menu()
-│   ├── recipes_menu()         run_recipe()
-│   ├── doctor()
-│   ├── do_update()
-│   └── show_help()
-├── doctor | selftest | wordlists | update
+│   ├── recipes_menu()         run_recipe() (10 resep aman)
+│   ├── theme_menu()           pilih tema & toggle animasi
+│   ├── doctor() / do_update() / show_help()
+├── search | examples | automation | logs | theme | doctor | selftest | lint | list | wordlists | update
 ├── tool <id> | recipe <nama>
 └── --preview-* (dipanggil fzf sebagai subprocess)
 ```
 
 ### Preview
 
-fzf memanggil ulang script dengan flag internal:
+fzf memanggil ulang script dengan flag internal (dengan `FORCE_COLOR=1`):
 
 - `--preview-tool <id>`
 - `--preview-category <id>`
 - `--preview-wordlist <path>`
 - `--preview-recipe <nama>`
+- `--preview-snippet <baris>`
+- `--preview-automation <path>`
+- `--preview-log <path>`
+- `--preview-theme <item>`
+- `--preview-global <item>`
+- `--preview-history <item>`
 
-Preview tidak boleh memodifikasi state. Semua output preview bersifat read-only.
+Preview bersifat read-only dan tidak memodifikasi state.
 
 ### Eksekusi perintah
 
 `execute_command(id, label, mode, sudo_flag, cmd)`:
 
-1. Menampilkan peringatan sudo bila perlu.
-2. Menulis entri ke `history.log` (timestamp, id, perintah).
-3. Membuat log sesi di `logs/` dengan header konteks.
-4. Menjalankan `eval` untuk mode `term`, atau `setsid`/`nohup` untuk `gui`.
-5. Menulis exit code ke log dan menampilkan lokasinya.
+1. Menampilkan kartu header perintah.
+2. Jika `DRY_RUN=1`, menampilkan `[DRY-RUN]` dan berhenti tanpa eksekusi.
+3. Menampilkan peringatan sudo bila perlu.
+4. Menulis entri ke `history.log` (timestamp, id, perintah).
+5. Membuat log sesi di `logs/` dengan header konteks.
+6. Menjalankan `eval` untuk mode `term` (mencatat exit code & durasi), atau `setsid`/`nohup` untuk `gui`.
+7. Menampilkan lokasi log, lalu `pause` (jika stdin TTY).
 
 Tidak ada penyimpanan password. Prompt sudo diserahkan ke `sudo` di terminal.
 
-## Registry tool
+## Registry tool & Snippet
 
-File: `config/tools.tsv`, delimiter `|`, 11 field:
+### `config/tools.tsv` (51 entri, delimiter `|`, 11 field)
 
 | Field | Nama | Keterangan |
 | ---: | --- | --- |
@@ -99,84 +129,51 @@ File: `config/tools.tsv`, delimiter `|`, 11 field:
 | 8 | `sudo` | `1` jika butuh sudo |
 | 9 | `arg_prompt` | label prompt argumen |
 | 10 | `mode` | `term` atau `gui` |
-| 11 | `examples` | contoh singkat |
+| 11 | `examples` | contoh singkat (tanpa karakter `|`) |
 
-Baris komentar diawali `#`. Fungsi pembaca utama:
+### `config/snippets.tsv` (104 entri, delimiter TAB `\t`, 6 field)
 
-- `find_tool_line <id>` — ambil baris registry
-- `tool_field <id> <n>` — ambil field tertentu
-- `tool_count_category <cat>` — hitung terpasang/total
-- `tool_count_installed` — total tool terpasang
+| Field | Nama | Keterangan |
+| ---: | --- | --- |
+| 1 | `tool_id` | harus cocok dengan `id` di `tools.tsv` |
+| 2 | `title` | judul singkat contoh perintah |
+| 3 | `command` | perintah lengkap (boleh memakai pipe `|` dan placeholder `{...}`) |
+| 4 | `notes` | penjelasan fungsi perintah |
+| 5 | `sudo` | `1` jika butuh sudo |
+| 6 | `placeholders` | daftar placeholder yang dipakai (mis. `TARGET,PORT`) |
 
 ## Kategori
 
-Kategori didefinisikan di tiga tempat dan harus konsisten:
+Kategori didefinisikan di `lib/core.sh` (`CAT_NAMES`, `CAT_ICONS`, `CAT_DESC`),
+`main_menu()` di `lib/menu.sh`, dan `config/tools.tsv`:
 
-1. `CAT_NAMES` dan `CAT_DESC` di `bin/netlauncher`
-2. Entri statis di `main_menu()`
-3. Nilai `category` di `config/tools.tsv`
-
-Kategori saat ini: `diagnostik`, `dns`, `interface`, `scan`, `wireless`,
-`security`, `hackingtool`.
-
-## Resep
-
-Setiap resep adalah fungsi `recipe_<nama>()` dengan pola:
-
-1. Cek dependensi.
-2. Minta input bila perlu.
-3. Tampilkan perintah yang akan dijalankan.
-4. Minta konfirmasi untuk scan/capture.
-5. Jalankan dan `tee` ke log.
-6. Tampilkan lokasi log, lalu `pause`.
-
-Pendaftaran resep tersebar di `preview_recipe()`, `recipes_menu()`,
-`run_recipe()`, dan `print_cli_help()`.
-
-## Index wordlist
-
-`wordlist_refresh()` memindai sumber tetap dan menulis
-`config/wordlists.tsv` dengan format:
-
-```text
-name|path|category|lines|size|source|license
-```
-
-Duplikat dicegah lewat file sementara `WL_SEEN_FILE` berisi realpath. File ini
-adalah cache yang dapat dibangun ulang kapan saja dan tidak di-track git.
+`diagnostik`, `dns`, `interface`, `scan`, `wireless`, `security`, `hackingtool`.
 
 ## State runtime
 
 | File | Isi | Permission |
 | --- | --- | --- |
-| `logs/*.log` | output per eksekusi + header | `600` |
-| `history.log` | 100 perintah terakhir | `600` |
+| `logs/*.log` | output per eksekusi + header (rotasi > 30 hari) | `600` |
+| `history.log` | riwayat perintah | `600` |
+| `targets.history` | riwayat target/domain/URL untuk Smart Picker | `600` |
 | `config/favorites.tsv` | daftar id favorit | `600` |
 | `config/wordlists.tsv` | index wordlist | `600` |
+| `config/theme.env` | preferensi tema & animasi | `600` |
 
 Direktori data dan log memakai `700`.
 
 ## Model keamanan
 
 - Launcher hanya membuka tool yang sudah terpasang; tidak mengunduh payload.
-- Resep tidak mengotomasi deauth, handshake capture, atau brute-force.
-- Scan dan capture menampilkan perintah dan meminta konfirmasi.
-- Tidak ada kredensial yang disimpan.
+- Resep dan snippet tidak mengotomasi deauth, handshake capture, atau brute-force.
+- Scan, capture, dan snippet berdampak menampilkan perintah dan meminta konfirmasi.
+- Tidak ada kredensial yang disimpan (`targets.history` juga menyaring spasi/kata sensitif).
 - Log dapat memuat data sensitif; jangan dibagikan tanpa sanitasi.
-
-## Titik ekstensi
-
-- Tool baru: `config/tools.tsv`.
-- Kategori baru: `CAT_NAMES`, `CAT_DESC`, `main_menu()`, dan registry.
-- Resep baru: fungsi `recipe_*` + 3 titik pendaftaran.
-- Sumber wordlist baru: `wordlist_refresh()`.
-- Perintah CLI baru: blok `case` di `main()` + `print_cli_help()`.
 
 ## Batasan yang diketahui
 
-- Script masih monolitik (~950 baris); pemecahan modul ada di roadmap.
-- `%s` hanya mendukung satu argumen; argumen kompleks memakai menu "Jalankan
-  dengan argumen".
-- `eval` dipakai untuk template internal, bukan input bebas dari jaringan.
-- fzf harus tersedia di PATH atau `FZF_BIN`.
+- `%s` pada `tools.tsv` hanya mendukung satu argumen; perintah multi-parameter
+  memakai `snippets.tsv` + `smart_resolve_template()` atau Command Builder.
+- `eval` dipakai untuk template internal dan perintah yang telah dikonfirmasi pengguna.
+- `fzf` 0.60+ (terpasang `0.75`) diperlukan untuk `--style=full:rounded` dan label border.
 - GUI mode bergantung pada sesi desktop dan `DISPLAY`.
