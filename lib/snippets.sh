@@ -1,14 +1,12 @@
 # lib/snippets.sh - Browser contoh perintah, code snippet, dan eksekusi pintar
 
 snippet_line_by_num() {
-  local num="$1"
-  [ -f "$SNIPPETS_FILE" ] || return 1
-  sed -n "${num}p" "$SNIPPETS_FILE"
+  snippet_line_by_ref "$1"
 }
 
 preview_snippet() {
-  local num="$1" line tool_id title cmd notes sudo ph binary status
-  line="$(snippet_line_by_num "$num")"
+  local ref="$1" line tool_id title cmd notes sudo ph binary status
+  line="$(snippet_line_by_ref "$ref")"
   [ -n "$line" ] || { printf 'Snippet tidak ditemukan.\n'; return 0; }
   IFS=$'\t' read -r tool_id title cmd notes sudo ph <<< "$line"
   binary="$(tool_field "$tool_id" 4)"
@@ -40,16 +38,19 @@ preview_snippet() {
 }
 
 snippets_menu() {
-  local filter_tool="${1:-}" file sel num header
+  local filter_tool="${1:-}" file sel ref header sf tag
   [ -f "$SNIPPETS_FILE" ] || { err "File snippet tidak ditemukan: $SNIPPETS_FILE"; pause; return 1; }
   file="$(mktemp)"
-  awk -F'\t' -v ft="$filter_tool" '
-    !/^#/ && NF>=6 {
-      if (ft == "" || $1 == ft) {
-        printf "\033[36m⌘\033[0m  %-14s │ %-34s \033[2m%s\033[0m\t%d\n", $1, $2, substr($3,1,45), NR
+  while IFS= read -r sf; do
+    if [ "$sf" = "$SNIPPETS_LOCAL_FILE" ]; then tag="local"; else tag="main"; fi
+    awk -F'\t' -v ft="$filter_tool" -v tg="$tag" '
+      !/^#/ && NF>=6 {
+        if (ft == "" || $1 == ft) {
+          printf "\033[36m⌘\033[0m  %-14s │ %-34s \033[2m%s\033[0m\t%s:%d\n", $1, $2, substr($3,1,45), tg, NR
+        }
       }
-    }
-  ' "$SNIPPETS_FILE" > "$file"
+    ' "$sf"
+  done < <(snippets_files) > "$file"
 
   if [ ! -s "$file" ]; then
     rm -f "$file"
@@ -80,8 +81,8 @@ snippets_menu() {
     --delimiter=$'\t' --with-nth=1 < "$file")"
   rm -f "$file"
   [ -n "$sel" ] || return 0
-  num="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
-  snippet_action_menu "$num"
+  ref="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  snippet_action_menu "$ref"
 }
 
 snippet_save_automation() {
@@ -109,8 +110,8 @@ EOF
 }
 
 snippet_action_menu() {
-  local num="$1" line tool_id title cmd notes sudo ph binary mode file sel action resolved edited ans
-  line="$(snippet_line_by_num "$num")"
+  local ref="$1" line tool_id title cmd notes sudo ph binary mode file sel action resolved edited
+  line="$(snippet_line_by_ref "$ref")"
   [ -n "$line" ] || return 1
   IFS=$'\t' read -r tool_id title cmd notes sudo ph <<< "$line"
   binary="$(tool_field "$tool_id" 4)"
@@ -135,7 +136,7 @@ snippet_action_menu() {
     --header-first \
     --header-label=' Aksi Snippet ' \
     --list-label=' Pilihan ' \
-    --preview="$SELF --preview-snippet $num" \
+    --preview="$SELF --preview-snippet $(printf '%q' "$ref")" \
     --preview-window='right:56%:wrap' \
     --preview-label=' Detail Perintah ' \
     --footer='Enter: Pilih │ Esc: Kembali' \
@@ -150,14 +151,14 @@ snippet_action_menu() {
       have "$binary" || { smart_missing_advisor "$binary" "$tool_id" "$(tool_field "$tool_id" 1)"; return 1; }
       resolved="$(smart_resolve_template "$cmd")" || { warn "Dibatalkan."; return 0; }
       if [ "$action" = "dry" ]; then
-        DRY_RUN=1 execute_command "$tool_id" "$title" "$mode" "$sudo" "$resolved"
+        DRY_RUN=1 runner_exec "$tool_id" "$title" "$mode" "$sudo" "$resolved"
       else
-        if [ "$sudo" = "1" ] || [[ "$tool_id" =~ ^(nmap|masscan|arp-scan|netdiscover|nikto|gobuster|ffuf|feroxbuster|dirb|wfuzz|nuclei|sqlmap|hydra)$ ]]; then
-          printf '%sPerintah:%s %s\n' "$C_MUTED" "$C_RESET" "$resolved"
-          read -r -p "Saya berwenang menjalankan perintah ini pada target? (y/N): " ans || true
-          [[ "$ans" =~ ^[yY]$ ]] || { warn "Dibatalkan."; return 0; }
+        if confirm_authorized_action "$tool_id" "$resolved" "$sudo"; then
+          runner_exec "$tool_id" "$title" "$mode" "$sudo" "$resolved"
+        else
+          warn "Dibatalkan."
+          pause
         fi
-        execute_command "$tool_id" "$title" "$mode" "$sudo" "$resolved"
       fi
       ;;
     edit)
@@ -165,7 +166,12 @@ snippet_action_menu() {
       resolved="$(smart_resolve_template "$cmd")" || resolved="$cmd"
       read -r -e -i "$resolved" -p "Edit perintah: " edited || true
       [ -n "$edited" ] || { warn "Dibatalkan."; return 0; }
-      execute_command "$tool_id" "$title" "$mode" "$sudo" "$edited"
+      if confirm_authorized_action "$tool_id" "$edited" "$sudo"; then
+        runner_exec "$tool_id" "$title" "$mode" "$sudo" "$edited"
+      else
+        warn "Dibatalkan."
+        pause
+      fi
       ;;
     copy)
       if copy_to_clipboard "$cmd"; then

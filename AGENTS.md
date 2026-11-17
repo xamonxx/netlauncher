@@ -8,8 +8,10 @@ detail internal.
 
 NetLauncher adalah launcher terminal modern berbasis Bash + fzf untuk tool
 jaringan dan keamanan yang sudah terpasang di Kali Linux. UI berbahasa Indonesia,
-arsitektur modular (`bin/netlauncher` + `lib/*.sh`), registry tool & snippet
-berbasis TSV, dan seluruh aksi berjalan lokal tanpa server.
+arsitektur modular (`bin/netlauncher` + 11 modul `lib/*.sh`), registry tool,
+snippet, dan flag berbasis TSV, knowledge base + Interactive Flag Builder,
+Automation Flow deklaratif (`.flow`), Target Workspace, Modern Execution Runner,
+dan seluruh aksi berjalan lokal tanpa server. Versi aktif: **2.1.0**.
 
 Repo ini adalah **sumber kanonik**. Lokasi live hanyalah symlink:
 
@@ -48,19 +50,28 @@ karena symlink.
 ├── bin/
 │   └── netlauncher        # entrypoint CLI & menu loop (Bash)
 ├── lib/
-│   ├── core.sh            # path, env override, helper, registry, target history
+│   ├── core.sh            # path, overlay, workspace, helper, registry, target history
 │   ├── ui.sh              # tema truecolor, animasi, badge, wrapper fzf
+│   ├── runner.sh          # PTY runner, parser output, post-run viewer, ekspor Markdown
 │   ├── smart.sh           # konteks jaringan, smart picker, command builder, advisor
 │   ├── snippets.sh        # browser & runner 104 contoh perintah
 │   ├── wordlists.sh       # indexer & browser wordlist
+│   ├── knowledge.sh       # 27 panduan resmi, 205 flag, flag builder, live --help/man
+│   ├── flow.sh            # engine .flow, wizard, pipeline runner, dashboard
 │   ├── recipes.sh         # 10 resep aman & custom automation scripts
-│   ├── menu.sh            # menu utama, pencarian global, aksi tool, riwayat & log
+│   ├── menu.sh            # menu utama, workspace, pencarian global, aksi tool, log
 │   └── doctor.sh          # doctor, selftest, lint, list (--json), update, help
 ├── config/
 │   ├── tools.tsv          # registry 51 tool, 11 field (delimiter |)
 │   ├── snippets.tsv       # 104 contoh perintah, 6 field (delimiter tab)
+│   ├── flags.tsv          # 205 flag resmi, 7 field (delimiter tab)
+│   ├── guides/            # 27 panduan resmi Bahasa Indonesia (*.md)
+│   ├── flows/             # 6 starter automation flow (*.flow)
 │   ├── automations/       # starter & custom automation scripts (*.sh)
 │   ├── help.md            # panduan pengguna di dalam TUI
+│   ├── tools.local.tsv    # overlay lokal, tidak di-track
+│   ├── snippets.local.tsv # overlay lokal, tidak di-track
+│   ├── flows.local/       # overlay lokal, tidak di-track
 │   ├── favorites.tsv      # runtime, tidak di-track
 │   ├── wordlists.tsv      # hasil generate, tidak di-track
 │   ├── theme.env          # runtime preferensi tema/animasi, tidak di-track
@@ -75,7 +86,8 @@ karena symlink.
 └── scripts/
     ├── install.sh
     ├── backup.sh
-    └── ui-test.sh
+    ├── ui-test.sh
+    └── completions/       # netlauncher.bash + _netlauncher (zsh)
 ```
 
 Data runtime tetap di luar repo:
@@ -84,6 +96,7 @@ Data runtime tetap di luar repo:
 - `~/.local/share/netlauncher/history.log`
 - `~/.local/share/netlauncher/targets.history`
 - `~/.cache/netlauncher/`
+- `~/.local/share/netlauncher/workspace.env` (Target Workspace)
 - `~/wordlists/`, `~/laporan/`
 
 ## Konvensi kode
@@ -128,6 +141,33 @@ tool_id	title	command	notes	sudo	placeholders
 - Setelah menambah tool atau snippet: jalankan `netlauncher lint` dan
   `netlauncher selftest`.
 
+## Registry flag (`config/flags.tsv`) & Panduan (`config/guides/`)
+
+Format wajib `flags.tsv` (7 field dengan delimiter **TAB**):
+
+```text
+tool_id	flag	arg_spec	category	risk	description_id	example
+```
+
+- `tool_id` harus ada di `tools.tsv`. `arg_spec` boleh kosong atau placeholder
+  (`{TARGET}`, `{DOMAIN}`, `{URL}`, `{WORDLIST}`, dll.) / keterangan (mis. `<detik>`).
+- `risk` hanya `pasif`, `aman`, `aktif`, atau `sudo`.
+- `description_id` dan `example` wajib di Bahasa Indonesia / perintah nyata.
+- `config/guides/<tool_id>.md` adalah panduan resmi ringkas; fallback:
+  `ip-route` → `ip-addr.md`, `hashcat` → `john.md`.
+
+## Automation Flow (`config/flows/*.flow`)
+
+Format INI tiga blok: `[flow]` (metadata), `[inputs]` (placeholder → hint),
+dan `[step:N]` (`title`, `tool`, `when`, `parser`, `on_error`, `timeout`,
+`capture`, `cmd`).
+
+- `when` boleh digabung dengan `;`, mis. `have:nmap;confirm:Jalankan scan?`.
+- `capture` berbentuk `VAR=perintah_filter` dan membaca output teks langkah.
+- `cmd` boleh memakai `{VAR}`; `{DATE}` dan `{REPORT_DIR}` otomatis tersedia.
+- Flow dengan `risk = aktif` atau `requires_auth = true` wajib konfirmasi.
+- Jangan menambahkan flow deauth, handshake capture, atau brute-force.
+
 ## Alur pengembangan
 
 ```bash
@@ -152,8 +192,10 @@ make ui-test
 ```
 
 Jika mengubah UI atau navigasi, uji minimal: menu utama → kategori → aksi tool →
-kembali, serta browser snippet (`Ctrl-E`), pencarian global (`Ctrl-S`), tema
-(`Ctrl-T`), browser wordlist, dan menu resep.
+kembali, serta browser snippet (`Ctrl-E`), pencarian global (`Ctrl-S`),
+Knowledge (`Ctrl-K`), Workspace (`Ctrl-W`), Automation Flow, tema (`Ctrl-T`),
+browser wordlist, runner pasca-eksekusi, dan menu resep. `make ui-test` kini
+mencakup knowledge, workspace, dan flow.
 
 ## Definition of done
 
@@ -161,12 +203,13 @@ Sebuah perubahan dianggap selesai jika:
 
 - [ ] `make syntax` (`bash -n` pada `bin/netlauncher`, `lib/*.sh`, `config/automations/*.sh`, `scripts/*.sh`) lolos.
 - [ ] `netlauncher lint` lolos tanpa error.
-- [ ] `make test` (atau `tests/smoke.sh`) lolos.
+- [ ] `make test` (atau `tests/smoke.sh`) lolos (termasuk runner, knowledge, flow, workspace, dan overlay).
 - [ ] `netlauncher selftest` tanpa error.
 - [ ] `netlauncher doctor` tidak memunculkan masalah baru.
 - [ ] UI masih tampil normal (`make ui-test`) jika ada perubahan tampilan.
 - [ ] Fitur baru punya entri di `config/help.md` dan `docs/CHANGELOG.md`.
-- [ ] Perubahan arsitektur/path dicatat di `MEMORY.md`.
+- [ ] Perubahan arsitektur/path/CLI dicatat di `MEMORY.md`, `docs/ARCHITECTURE.md`, dan `README.md`.
+- [ ] Perintah/flag/flow baru tercantum di `print_cli_help()` (`lib/doctor.sh`) dan completion.
 - [ ] Tidak ada rahasia atau otomasi ofensif yang masuk.
 
 ## Menambah tool

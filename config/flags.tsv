@@ -1,0 +1,206 @@
+# tool_id	flag	arg_spec	category	risk	description_id	example
+ping	-c	<jumlah>	timing	aman	Batasi jumlah paket ICMP echo yang dikirim sebelum berhenti.	ping -c 4 1.1.1.1
+ping	-i	<detik>	timing	aman	Atur interval jeda antar paket (default 1 detik; <0.2 butuh root).	ping -c 10 -i 0.2 1.1.1.1
+ping	-W	<detik>	timing	aman	Batas waktu tunggu balasan per paket dalam detik.	ping -c 4 -W 2 1.1.1.1
+ping	-D		output	aman	Tampilkan timestamp UNIX sebelum setiap baris balasan.	ping -D -c 5 1.1.1.1
+ping	-n		output	aman	Tampilkan alamat IP numerik tanpa reverse DNS lookup.	ping -n -c 4 1.1.1.1
+ping	-I	{IFACE}	target	aman	Kirim paket ping melalui interface atau IP sumber tertentu.	ping -I eth0 -c 4 1.1.1.1
+ping	-4		general	aman	Paksa menggunakan IPv4 saja.	ping -4 -c 4 example.com
+ping	-6		general	aman	Paksa menggunakan IPv6 saja.	ping -6 -c 4 example.com
+traceroute	-n		output	aman	Tampilkan IP hop langsung tanpa reverse DNS lookup (lebih cepat).	traceroute -n example.com
+traceroute	-T		scan	sudo	Gunakan probe TCP SYN (berguna saat ICMP diblokir firewall; butuh sudo).	sudo traceroute -T -p 443 example.com
+traceroute	-I		scan	sudo	Gunakan ICMP ECHO untuk probe hop (butuh sudo).	sudo traceroute -I example.com
+traceroute	-p	{PORT}	target	aman	Tentukan port tujuan untuk probe UDP/TCP.	sudo traceroute -T -p 443 example.com
+traceroute	-m	<max_ttl>	timing	aman	Atur jumlah hop maksimum (default 30).	traceroute -m 20 example.com
+traceroute	-w	<detik>	timing	aman	Atur waktu tunggu respons per probe.	traceroute -w 2 example.com
+curl	-I		http	aman	Kirim request HEAD untuk mengambil header HTTP saja tanpa body.	curl -I https://example.com
+curl	-L		http	aman	Ikuti redirect HTTP (301/302/307/308) secara otomatis.	curl -IL https://example.com
+curl	-s		output	aman	Mode senyap: sembunyikan progress meter dan pesan error standar.	curl -s https://ifconfig.me
+curl	-S		output	aman	Tetap tampilkan pesan error saat memakai -s.	curl -sS https://example.com
+curl	-v		output	aman	Mode verbose: tampilkan detail handshake TLS, header request, dan respons.	curl -vI https://example.com
+curl	-k		tls	aman	Lewati verifikasi sertifikat TLS (hanya untuk uji lab/self-signed).	curl -kI https://127.0.0.1
+curl	--max-time	<detik>	timing	aman	Batas waktu total eksekusi request dalam detik.	curl -ILsS --max-time 10 https://example.com
+curl	-H	<Header:Val>	http	aman	Tambahkan header HTTP kustom pada request.	curl -sI -H 'Accept: application/json' https://example.com
+curl	-X	<METHOD>	http	aman	Tentukan metode HTTP (GET, HEAD, OPTIONS, POST).	curl -sI -X OPTIONS https://example.com
+curl	-o	<file>	output	aman	Simpan body respons ke file (atau /dev/null untuk benchmark).	curl -o /dev/null -s -w '%{http_code}\n' https://example.com
+curl	-w	<format>	output	aman	Cetak metrik timing/status terformat setelah transfer selesai.	curl -o /dev/null -s -w 'DNS=%{time_namelookup}s Total=%{time_total}s\n' https://example.com
+wget	--spider		http	aman	Periksa ketersediaan URL tanpa mengunduh isi file.	wget --spider -S https://example.com
+wget	-S		output	aman	Cetak header respons HTTP dari server.	wget --spider -S https://example.com
+wget	--timeout=	<detik>	timing	aman	Atur timeout koneksi dan baca dalam detik.	wget --spider --timeout=10 https://example.com
+wget	-q		output	aman	Mode senyap tanpa output progress.	wget -q --spider https://example.com
+wget	-O	<file>	output	aman	Simpan hasil unduhan ke nama file tertentu.	wget -O index.html https://example.com
+whois	-H		output	pasif	Sembunyikan disclaimer hukum panjang dari server WHOIS.	whois -H example.com
+whois	-h	<server>	target	pasif	Query ke server WHOIS tertentu secara eksplisit.	whois -h whois.iana.org example.com
+openssl	s_client		tls	pasif	Buka koneksi klien TLS untuk inspeksi sertifikat dan cipher server.	openssl s_client -connect example.com:443 </dev/null
+openssl	-connect	<host:port>	target	pasif	Tentukan host dan port TLS tujuan untuk s_client.	openssl s_client -connect example.com:443 </dev/null
+openssl	-servername	{DOMAIN}	tls	pasif	Kirim ekstensi SNI (wajib untuk server virtual host HTTPS).	openssl s_client -servername example.com -connect example.com:443 </dev/null
+openssl	-tls1_2		tls	pasif	Uji negosiasi khusus protokol TLS 1.2.	openssl s_client -tls1_2 -connect example.com:443 </dev/null
+openssl	-tls1_3		tls	pasif	Uji negosiasi khusus protokol TLS 1.3.	openssl s_client -tls1_3 -connect example.com:443 </dev/null
+openssl	-showcerts		output	pasif	Tampilkan seluruh rantai sertifikat (leaf + intermediate).	openssl s_client -showcerts -servername example.com -connect example.com:443 </dev/null
+nc	-z		scan	aman	Mode zero-I/O: hanya cek port terbuka tanpa mengirim data.	nc -zv -w 3 127.0.0.1 80
+nc	-v		output	aman	Mode verbose untuk menampilkan status koneksi port.	nc -zv 127.0.0.1 22
+nc	-n		general	aman	Gunakan IP numerik saja tanpa DNS lookup.	nc -znv 127.0.0.1 80
+nc	-w	<detik>	timing	aman	Timeout koneksi dan idle dalam detik.	nc -zv -w 3 127.0.0.1 80
+nc	-u		general	aman	Gunakan protokol UDP alih-alih TCP.	nc -zuv -w 2 127.0.0.1 53
+nc	-l		general	aman	Mode listen untuk menerima koneksi masuk (uji lokal).	nc -lvp 9000
+socat	-V		general	pasif	Tampilkan versi dan fitur kompilasi socat (OpenSSL, IPv6, dll).	socat -V
+socat	-d		output	aman	Tingkatkan level logging diagnostik (gunakan -d -d untuk detail).	socat -d -d - TCP:127.0.0.1:80
+dig	+short		output	pasif	Tampilkan jawaban DNS ringkas tanpa header/komentar.	dig +short A example.com
+dig	+noall		output	pasif	Matikan semua bagian output default (kombinasikan dengan +answer).	dig +noall +answer example.com A
+dig	+answer		output	pasif	Tampilkan bagian Answer record DNS.	dig +noall +answer example.com MX
+dig	+trace		dns	pasif	Lacak delegasi DNS dari root server hingga authoritative NS.	dig +trace example.com
+dig	+dnssec		dns	pasif	Minta record DNSSEC (RRSIG/DNSKEY) dalam query.	dig +dnssec example.com
+dig	-x	{TARGET}	dns	pasif	Lakukan reverse DNS lookup (PTR) dari alamat IP.	dig -x 1.1.1.1 +short
+dig	+tcp		dns	pasif	Gunakan TCP alih-alih UDP untuk query DNS.	dig +tcp example.com ANY
+nslookup	-type=	<record>	dns	pasif	Tentukan tipe record DNS (A, AAAA, MX, NS, TXT, SOA).	nslookup -type=MX example.com
+whatweb	-a	<1|3|4>	scan	aman	Level agresi: 1=pasif/1 request, 3=agresif, 4=berat.	whatweb -a 1 https://example.com
+whatweb	-v		output	aman	Tampilkan detail plugin dan bukti deteksi teknologi.	whatweb -v https://example.com
+whatweb	--no-errors		output	aman	Sembunyikan pesan error koneksi dari output.	whatweb -a 1 --no-errors https://example.com
+whatweb	--log-json=	<file>	output	aman	Simpan hasil fingerprint dalam format JSON.	whatweb -a 1 --log-json=whatweb.json https://example.com
+nikto	-h	{URL}	target	aktif	Tentukan host atau URL target berizin untuk audit web.	nikto -h https://example.com
+nikto	-Tuning	<kode>	audit	aktif	Pilih kategori tes (1=file menarik, 2=misconfig, 3=info disclosure, b=software).	nikto -h https://example.com -Tuning 123b
+nikto	-ssl		tls	aktif	Paksa mode SSL/HTTPS pada target.	nikto -h example.com -p 443 -ssl
+nikto	-o	<file>	output	aktif	Simpan laporan hasil audit ke file.	nikto -h https://example.com -o laporan.html -Format htm
+nikto	-Format	<htm|txt|json>	output	aktif	Tentukan format file laporan output Nikto.	nikto -h https://example.com -o laporan.json -Format json
+nikto	-maxtime	<detik>	timing	aktif	Batasi durasi maksimum pemindaian Nikto.	nikto -h https://example.com -maxtime 60s
+gobuster	dir		discovery	aktif	Subcommand enumerasi direktori dan file web.	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+gobuster	dns		discovery	aktif	Subcommand enumerasi subdomain DNS.	gobuster dns --domain example.com -w /usr/share/dirb/wordlists/common.txt
+gobuster	-u	{URL}	target	aktif	URL target untuk mode dir/vhost.	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+gobuster	-w	{WORDLIST}	target	aktif	Path file wordlist yang digunakan.	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+gobuster	-t	<threads>	timing	aktif	Jumlah thread konkuren (default 10; jaga agar tidak membebani target).	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt -t 20
+gobuster	-k		tls	aktif	Lewati verifikasi sertifikat TLS (untuk lab/self-signed).	gobuster dir -u https://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt -k
+gobuster	-x	<ext>	filter	aktif	Tambahkan ekstensi file yang dicari (mis. php,txt,html).	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt -x php,txt
+gobuster	-r		http	aktif	Ikuti HTTP redirect secara otomatis.	gobuster dir -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt -r
+ffuf	-u	{URL}	target	aktif	URL target dengan kata kunci FUZZ di posisi yang diuji.	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt
+ffuf	-w	{WORDLIST}	target	aktif	Path wordlist untuk menggantikan kata kunci FUZZ.	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt
+ffuf	-mc	<codes>	filter	aktif	Match HTTP status code tertentu (mis. 200,204,301,302,403).	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt -mc 200,301,403
+ffuf	-fc	<codes>	filter	aktif	Filter/sembunyikan HTTP status code tertentu (mis. 404).	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt -fc 404
+ffuf	-fs	<size>	filter	aktif	Filter respons berdasarkan ukuran byte (berguna untuk wildcard vhost).	ffuf -u http://127.0.0.1 -H 'Host: FUZZ.local' -w /usr/share/dirb/wordlists/common.txt -fs 0
+ffuf	-t	<threads>	timing	aktif	Jumlah thread konkuren (default 40).	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt -t 20
+ffuf	-rate	<req/s>	timing	aktif	Batasi kecepatan request per detik agar aman bagi server target.	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt -rate 50
+ffuf	-H	<Header:Val>	http	aktif	Tambahkan header HTTP (mis. Host: FUZZ.domain untuk vhost).	ffuf -u http://127.0.0.1 -H 'Host: FUZZ.example.com' -w /usr/share/dirb/wordlists/common.txt
+ffuf	-of	<json|csv|md>	output	aktif	Format file output saat memakai -o.	ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt -of json -o ffuf.json
+feroxbuster	-u	{URL}	target	aktif	URL target untuk enumerasi konten rekursif.	feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+feroxbuster	-w	{WORDLIST}	target	aktif	Path wordlist yang digunakan.	feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
+feroxbuster	--depth	<angka>	discovery	aktif	Kedalaman maksimum rekursi direktori (default 4).	feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt --depth 2
+feroxbuster	-t	<threads>	timing	aktif	Jumlah thread konkuren.	feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt -t 20
+feroxbuster	--no-state		output	aktif	Jangan simpan file state resume saat selesai/dibatalkan.	feroxbuster -u http://127.0.0.1 --no-state
+feroxbuster	-k		tls	aktif	Abaikan validasi sertifikat TLS (untuk lab).	feroxbuster -u https://127.0.0.1 -k
+dirb	-S		output	aktif	Mode silent: sembunyikan detail pengujian tiap kata.	dirb http://127.0.0.1 /usr/share/dirb/wordlists/common.txt -S
+dirb	-r		discovery	aktif	Jangan lakukan scan rekursif ke subdirektori.	dirb http://127.0.0.1 /usr/share/dirb/wordlists/common.txt -r
+wfuzz	-c		output	aktif	Tampilkan output berwarna di terminal.	wfuzz -c -z file,/usr/share/dirb/wordlists/common.txt --hc 404 http://127.0.0.1/FUZZ
+wfuzz	--hc	<codes>	filter	aktif	Sembunyikan respons dengan status code tertentu (mis. 404).	wfuzz -c -z file,/usr/share/dirb/wordlists/common.txt --hc 404 http://127.0.0.1/FUZZ
+wfuzz	-z	<file,path>	target	aktif	Tentukan payload source (mis. file,/path/wordlist.txt).	wfuzz -c -z file,/usr/share/dirb/wordlists/common.txt http://127.0.0.1/FUZZ
+httpx	-u	{URL}	target	aman	Target URL/host tunggal untuk probe HTTPX Toolkit.	httpx-toolkit -u https://example.com -status-code -title
+httpx	-l	{FILE}	target	aman	Baca daftar host/URL dari file teks.	httpx-toolkit -l hosts.txt -status-code -title
+httpx	-status-code		http	aman	Tampilkan HTTP status code respons.	httpx-toolkit -u https://example.com -status-code
+httpx	-title		http	aman	Ekstrak dan tampilkan tag <title> halaman web.	httpx-toolkit -u https://example.com -title
+httpx	-tech-detect		http	aman	Deteksi teknologi web berbasis dataset Wappalyzer.	httpx-toolkit -u https://example.com -tech-detect
+httpx	-ip		dns	aman	Tampilkan alamat IP hasil resolusi host.	httpx-toolkit -u https://example.com -ip
+httpx	-cdn		dns	aman	Deteksi apakah target berada di balik CDN/WAF.	httpx-toolkit -u https://example.com -cdn
+httpx	-json		output	aman	Keluarkan hasil dalam format JSONL terstruktur.	httpx-toolkit -u https://example.com -json
+nuclei	-u	{URL}	target	aktif	Target URL/host tunggal untuk pemindaian template Nuclei.	nuclei -u https://example.com -tags misconfig
+nuclei	-l	{FILE}	target	aktif	Daftar target URL/host dari file.	nuclei -l targets.txt -severity medium,high
+nuclei	-tags	<tags>	filter	aktif	Filter template berdasarkan tag (mis. misconfig,exposure,ssl,dns).	nuclei -u https://example.com -tags ssl,misconfig
+nuclei	-severity	<levels>	filter	aktif	Filter tingkat keparahan (info,low,medium,high,critical).	nuclei -u https://example.com -severity low,medium,high
+nuclei	-rl	<req/s>	timing	aktif	Batasi rate limit request per detik (default 150).	nuclei -u https://example.com -tags misconfig -rl 30
+nuclei	-jsonl		output	aktif	Output hasil temuan dalam format JSON Lines.	nuclei -u https://example.com -tags ssl -jsonl
+nuclei	-update-templates		general	aman	Perbarui koleksi template resmi Nuclei.	nuclei -update-templates
+amass	enum		discovery	pasif	Subcommand enumerasi subdomain dan pemetaan aset.	amass enum -passive -d example.com
+amass	-passive		discovery	pasif	Kumpulkan data hanya dari sumber pasif tanpa menyentuh target.	amass enum -passive -d example.com
+amass	-d	{DOMAIN}	target	pasif	Domain target untuk enumerasi.	amass enum -passive -d example.com
+sqlmap	-u	{URL}	target	aktif	URL target dengan parameter query (mis. http://127.0.0.1/item?id=1).	sqlmap -u "http://127.0.0.1/item?id=1" --batch --banner
+sqlmap	-r	{FILE}	target	aktif	Baca raw HTTP request dari file teks.	sqlmap -r req.txt --batch --banner
+sqlmap	--batch		general	aktif	Jalankan non-interaktif dengan jawaban default otomatis.	sqlmap -u "http://127.0.0.1/item?id=1" --batch --banner
+sqlmap	--level=	<1-5>	audit	aktif	Kedalaman pengujian parameter/header (1=ringan, 5=ekstensif).	sqlmap -u "http://127.0.0.1/item?id=1" --batch --level=1
+sqlmap	--risk=	<1-3>	audit	aktif	Tingkat risiko payload uji (1=aman/default, 3=berisiko).	sqlmap -u "http://127.0.0.1/item?id=1" --batch --risk=1
+sqlmap	--banner		audit	aktif	Ambil banner versi DBMS jika terkonfirmasi pada target berizin.	sqlmap -u "http://127.0.0.1/item?id=1" --batch --banner
+searchsploit	--cve	{QUERY}	filter	pasif	Cari entri Exploit-DB berdasarkan nomor CVE (mis. 2024-1234).	searchsploit --cve 2024-1234
+searchsploit	-t		filter	pasif	Cari hanya pada judul entri (lebih presisi).	searchsploit -t openssh
+searchsploit	-j		output	pasif	Keluarkan hasil pencarian dalam format JSON.	searchsploit -j nginx
+searchsploit	-w		output	pasif	Tampilkan URL referensi Exploit-DB online.	searchsploit -w apache 2.4
+ip-addr	-brief		output	pasif	Tampilkan ringkasan padat satu baris per interface.	ip -brief addr
+ip-addr	-c		output	pasif	Aktifkan pewarnaan output terminal.	ip -c -brief addr
+ip-addr	-s		output	pasif	Tampilkan statistik paket RX/TX, error, dan dropped.	ip -s link show
+ip-addr	-j		output	pasif	Keluarkan output dalam format JSON (cocok diproses jq).	ip -j addr
+ip-route	-c		output	pasif	Aktifkan pewarnaan tabel routing.	ip -c route show
+ip-route	get	{TARGET}	dns	pasif	Tampilkan interface dan gateway yang dipilih kernel menuju target.	ip route get 1.1.1.1
+ss	-t		filter	pasif	Tampilkan socket TCP.	ss -tulpn
+ss	-u		filter	pasif	Tampilkan socket UDP.	ss -tulpn
+ss	-l		filter	pasif	Tampilkan hanya socket yang sedang listening.	ss -tulpn
+ss	-p		output	pasif	Tampilkan nama proses dan PID pemilik socket.	ss -tulpn
+ss	-n		output	pasif	Tampilkan nomor port dan IP numerik tanpa resolusi nama.	ss -tulpn
+ss	-s		output	pasif	Tampilkan ringkasan statistik jumlah socket per state.	ss -s
+ss	-a		filter	pasif	Tampilkan semua socket (listening maupun non-listening).	ss -tunap state established
+netstat	-tulpn		output	pasif	Tampilkan port TCP/UDP listening beserta PID dan alamat numerik.	netstat -tulpn
+iw-dev	dev		general	pasif	Daftar semua interface wireless dan tipe mode (managed/monitor).	iw dev
+iw-dev	link		general	pasif	Tampilkan status koneksi WiFi aktif (SSID, sinyal, bitrate).	iw dev wlan0 link
+iw-dev	scan		discovery	sudo	Pindai access point sekitar (butuh sudo).	sudo iw dev wlan0 scan
+nmcli	device		general	pasif	Kelola dan lihat status perangkat jaringan NetworkManager.	nmcli device status
+nmcli	connection		general	pasif	Lihat profil koneksi tersimpan dan koneksi aktif.	nmcli connection show --active
+ethtool	-i	{IFACE}	general	pasif	Tampilkan nama driver kernel, versi, dan firmware NIC.	ethtool -i eth0
+ethtool	-S	{IFACE}	output	pasif	Tampilkan statistik detail hardware NIC (error, drop, CRC).	ethtool -S eth0
+lsof	-i		filter	pasif	Tampilkan semua file/socket jaringan yang terbuka.	lsof -i -P -n
+lsof	-P		output	pasif	Tampilkan nomor port mentah tanpa konversi nama layanan.	lsof -i -P -n
+lsof	-n		output	pasif	Tampilkan alamat IP numerik tanpa reverse DNS lookup.	lsof -i -P -n
+nmap	-sV		scan	aktif	Deteksi versi layanan pada port yang terbuka.	nmap -sV -T4 --top-ports 100 127.0.0.1
+nmap	-sC		scan	aktif	Jalankan script NSE default yang aman untuk enumerasi layanan.	nmap -sC -sV -T4 127.0.0.1
+nmap	-sn		discovery	aman	Ping scan / host discovery saja tanpa memindai port.	nmap -sn 192.168.1.0/24
+nmap	-Pn		discovery	aktif	Lewati host discovery (anggap semua target online).	nmap -Pn -sV 127.0.0.1
+nmap	-sT		scan	aktif	TCP Connect scan (tidak butuh root/sudo).	nmap -sT -T4 --top-ports 100 127.0.0.1
+nmap	-sS		scan	sudo	TCP SYN stealth scan (lebih cepat, butuh sudo/root).	sudo nmap -sS -T4 --top-ports 100 127.0.0.1
+nmap	-sU		scan	sudo	UDP port scan (lambat, butuh sudo/root).	sudo nmap -sU --top-ports 20 127.0.0.1
+nmap	-p	<ports>	target	aktif	Tentukan port atau rentang port (mis. 22,80,443 atau 1-1000).	nmap -sV -p 22,80,443 127.0.0.1
+nmap	-p-		target	aktif	Pindai seluruh 65535 port TCP.	nmap -p- -T4 --min-rate 1000 127.0.0.1
+nmap	--top-ports	<jumlah>	target	aktif	Pindai N port paling umum menurut statistik Nmap.	nmap -sV --top-ports 100 127.0.0.1
+nmap	-T4		timing	aktif	Template timing agresif yang seimbang untuk jaringan modern.	nmap -sV -T4 127.0.0.1
+nmap	-n		dns	aktif	Matikan reverse DNS lookup agar scan lebih cepat.	nmap -n -sn 192.168.1.0/24
+nmap	--open		output	aktif	Tampilkan hanya port yang berstatus open.	nmap -sV --open 127.0.0.1
+nmap	-oN	<file>	output	aktif	Simpan output normal ke file teks.	nmap -sV -oN scan.txt 127.0.0.1
+nmap	-oX	<file>	output	aktif	Simpan output XML untuk diimpor ke tool lain.	nmap -sV -oX scan.xml 127.0.0.1
+nmap	--reason		output	aktif	Tampilkan alasan mengapa port dinyatakan open/closed/filtered.	nmap -sV --reason 127.0.0.1
+masscan	-p	<ports>	target	sudo	Tentukan port atau rentang port TCP yang dipindai.	sudo masscan 127.0.0.1 -p80,443 --rate=1000
+masscan	--rate=	<pkt/s>	timing	sudo	Batasi laju paket per detik (wajib dikontrol agar tidak membanjiri jaringan).	sudo masscan 127.0.0.1 -p80,443 --rate=1000
+masscan	--banners		scan	sudo	Ambil banner layanan sederhana dari port terbuka.	sudo masscan 127.0.0.1 -p80 --banners --rate=500
+arp-scan	--localnet		discovery	sudo	Pindai seluruh subnet pada interface aktif via ARP (butuh sudo).	sudo arp-scan --localnet
+arp-scan	-I	{IFACE}	target	sudo	Pilih interface jaringan tertentu untuk ARP scan.	sudo arp-scan -I eth0 --localnet
+arp-scan	-q		output	sudo	Output ringkas tanpa header/footer panjang.	sudo arp-scan -q --localnet
+netdiscover	-p		discovery	sudo	Mode pasif: hanya mendengarkan trafik ARP tanpa mengirim paket.	sudo netdiscover -i eth0 -p
+netdiscover	-P		output	sudo	Cetak hasil dalam format tabel lalu keluar (non-interaktif).	sudo netdiscover -P -r 192.168.1.0/24
+netdiscover	-r	{SUBNET}	target	sudo	Tentukan rentang subnet CIDR untuk discovery ARP aktif.	sudo netdiscover -P -r 192.168.1.0/24
+netdiscover	-i	{IFACE}	target	sudo	Pilih interface jaringan untuk netdiscover.	sudo netdiscover -i eth0 -p
+tcpdump	-i	{IFACE}	target	sudo	Pilih interface jaringan untuk capture paket (atau 'any').	sudo tcpdump -i eth0 -c 50 -nn
+tcpdump	-c	<jumlah>	timing	sudo	Berhenti otomatis setelah menangkap N paket.	sudo tcpdump -i eth0 -c 50 -nn
+tcpdump	-nn		output	sudo	Jangan konversi alamat IP maupun nomor port ke nama.	sudo tcpdump -i eth0 -c 50 -nn
+tcpdump	-w	<file.pcap>	output	sudo	Simpan paket mentah ke file PCAP untuk analisis Wireshark/TShark.	sudo tcpdump -i eth0 -c 100 -w capture.pcap
+tcpdump	-r	{FILE}	capture	aman	Baca dan filter paket dari file PCAP yang sudah ada (tanpa sudo).	tcpdump -nn -r capture.pcap
+tcpdump	-A		output	sudo	Cetak payload setiap paket dalam format ASCII (berguna untuk HTTP plaintext).	sudo tcpdump -i eth0 -c 20 -A port 80
+tcpdump	-v		output	sudo	Tampilkan detail header IP/TCP/TTL lebih lengkap.	sudo tcpdump -i eth0 -c 20 -nn -v
+tshark	-i	{IFACE}	target	sudo	Pilih interface untuk capture paket real-time.	sudo tshark -i eth0 -c 25
+tshark	-c	<jumlah>	timing	sudo	Berhenti setelah menangkap N paket.	sudo tshark -i eth0 -c 25
+tshark	-r	{FILE}	capture	aman	Baca dan analisis file PCAP offline (tanpa sudo).	tshark -r capture.pcap -q -z io,phs
+tshark	-Y	<display_filter>	filter	aman	Terapkan display filter Wireshark (mis. dns.qry.name atau http.request).	sudo tshark -i eth0 -Y 'dns.qry.name' -c 20
+tshark	-T	<fields|json>	output	aman	Format output terstruktur (mis. -T fields -e ip.src -e dns.qry.name).	tshark -r capture.pcap -T fields -e ip.src -e dns.qry.name
+tshark	-z	<stat>	output	aman	Tampilkan statistik protokol (mis. io,phs atau conv,tcp).	tshark -r capture.pcap -q -z io,phs
+tcpflow	-i	{IFACE}	target	sudo	Pilih interface untuk merekonstruksi aliran TCP.	sudo tcpflow -i eth0 -c port 80
+tcpflow	-c		output	sudo	Cetak aliran data langsung ke stdout tanpa membuat banyak file.	sudo tcpflow -i eth0 -c port 80
+ngrep	-d	{IFACE}	target	sudo	Pilih interface jaringan untuk pencarian pola paket.	sudo ngrep -d eth0 -q 'HTTP' port 80
+ngrep	-q		output	sudo	Mode quiet: sembunyikan tanda hash (#) per paket yang tidak cocok.	sudo ngrep -d eth0 -q 'GET' port 80
+ngrep	-W	<byline|normal>	output	sudo	Format pemisahan baris payload (byline sangat rapi untuk HTTP).	sudo ngrep -d eth0 -q -W byline 'HTTP' port 80
+wireshark	-r	{FILE}	capture	aman	Buka langsung file PCAP di antarmuka grafis Wireshark.	wireshark capture.pcap
+airmon-ng	check		general	sudo	Periksa proses sistem yang dapat mengganggu mode monitor WiFi.	sudo airmon-ng check
+aircrack-ng	-S		general	aman	Jalankan benchmark kecepatan CPU lokal untuk audit kunci.	aircrack-ng -S
+kismet	-c	{IFACE}	target	sudo	Tentukan sumber interface capture untuk Kismet.	sudo kismet -c wlan0
+reaver	--help		general	aman	Tampilkan dokumentasi opsi audit WPS berizin.	reaver --help
+wifite	--help		general	aman	Tampilkan dokumentasi opsi audit WiFi terpandu berizin.	wifite --help
+hydra	-U	<service>	general	aman	Tampilkan opsi spesifik modul layanan yang didukung Hydra.	hydra -U ssh
+john	--test		general	aman	Benchmark kecepatan hashing CPU lokal.	john --test
+john	--list=formats		general	aman	Tampilkan daftar format hash yang didukung John the Ripper.	john --list=formats
+john	--wordlist=	{WORDLIST}	target	aktif	Gunakan wordlist lokal untuk menguji kekuatan hash milik sendiri.	john --wordlist=/usr/share/john/password.lst hashes.txt
+hashcat	-b		general	aman	Jalankan benchmark performa GPU/CPU lokal.	hashcat -b
+hashcat	-I		general	aman	Tampilkan daftar perangkat OpenCL/CUDA yang terdeteksi.	hashcat -I
+msfconsole	-q		general	aman	Jalankan Metasploit Console tanpa banner ASCII panjang.	msfconsole -q
+msfconsole	-x	<cmds>	general	aman	Jalankan perintah konsol Metasploit secara berurutan.	msfconsole -q -x 'version; db_status; exit'
+hackingtool	--classic		general	aman	Jalankan antarmuka REPL klasik hackingtool.	hackingtool --classic
+hackingtool-classic	--classic		general	aman	Jalankan antarmuka REPL klasik hackingtool.	hackingtool --classic
+hackingtool-help	--help		general	pasif	Tampilkan opsi CLI headless dan laporan hackingtool.	hackingtool --help

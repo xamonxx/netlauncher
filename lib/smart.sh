@@ -104,6 +104,8 @@ smart_prompt_placeholder() {
   case "$kind" in
     TARGET)
       {
+        [ -n "${WS_TARGET:-}" ] && printf '%s★ %s%s  %s(Target Workspace aktif)%s\t%s\n' "$C_ACCENT$C_BOLD" "$WS_TARGET" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_TARGET"
+        [ -n "${WS_DOMAIN:-}" ] && [ "${WS_DOMAIN:-}" != "${WS_TARGET:-}" ] && printf '%s★ %s%s  %s(Domain Workspace aktif)%s\t%s\n' "$C_ACCENT" "$WS_DOMAIN" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_DOMAIN"
         printf '%s127.0.0.1%s  %s(localhost · aman untuk uji lokal)%s\t127.0.0.1\n' "$C_OK" "$C_RESET" "$C_MUTED" "$C_RESET"
         [ "$NET_GW" != "-" ] && printf '%s%s%s  %s(default gateway terdeteksi)%s\t%s\n' "$C_PRIMARY" "$NET_GW" "$C_RESET" "$C_MUTED" "$C_RESET" "$NET_GW"
         [ "$NET_IP" != "-" ] && printf '%s%s%s  %s(IP lokal mesin ini)%s\t%s\n' "$C_PRIMARY" "$NET_IP" "$C_RESET" "$C_MUTED" "$C_RESET" "$NET_IP"
@@ -128,6 +130,7 @@ smart_prompt_placeholder() {
 
     SUBNET)
       {
+        [ -n "${WS_SUBNET:-}" ] && printf '%s★ %s%s  %s(Subnet Workspace aktif)%s\t%s\n' "$C_ACCENT$C_BOLD" "$WS_SUBNET" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_SUBNET"
         [ "$NET_SUBNET" != "-" ] && printf '%s%s%s  %s(subnet aktif terdeteksi)%s\t%s\n' "$C_OK" "$NET_SUBNET" "$C_RESET" "$C_MUTED" "$C_RESET" "$NET_SUBNET"
         printf '%s127.0.0.0/24%s  %s(loopback)%s\t127.0.0.0/24\n' "$C_CYAN" "$C_RESET" "$C_MUTED" "$C_RESET"
         printf '%s✎ Ketik subnet CIDR manual...%s\t__CUSTOM__\n' "$C_ACCENT" "$C_RESET"
@@ -144,6 +147,7 @@ smart_prompt_placeholder() {
 
     IFACE)
       {
+        [ -n "${WS_IFACE:-}" ] && printf '%s★ %s%s  %s(Interface Workspace aktif)%s\t%s\n' "$C_ACCENT$C_BOLD" "$WS_IFACE" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_IFACE"
         [ "$NET_IFACE" != "-" ] && printf '%s%s%s  %s(interface aktif · %s · %s)%s\t%s\n' "$C_OK" "$NET_IFACE" "$C_RESET" "$C_MUTED" "$NET_IFACE_TYPE" "$NET_IP" "$C_RESET" "$NET_IFACE"
         ip -brief link 2>/dev/null | awk -v act="$NET_IFACE" '{
           if ($1 != act) printf "%s  [%s]\t%s\n", $1, $2, $1
@@ -162,6 +166,7 @@ smart_prompt_placeholder() {
 
     DOMAIN)
       {
+        [ -n "${WS_DOMAIN:-}" ] && printf '%s★ %s%s  %s(Domain Workspace aktif)%s\t%s\n' "$C_ACCENT$C_BOLD" "$WS_DOMAIN" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_DOMAIN"
         printf '%sexample.com%s  %s(domain uji standar)%s\texample.com\n' "$C_OK" "$C_RESET" "$C_MUTED" "$C_RESET"
         printf '%scloudflare.com%s  %s(uji DNS/TLS)%s\tcloudflare.com\n' "$C_CYAN" "$C_RESET" "$C_MUTED" "$C_RESET"
         if [ -s "$TARGET_HISTORY_FILE" ]; then
@@ -183,6 +188,7 @@ smart_prompt_placeholder() {
 
     URL)
       {
+        [ -n "${WS_URL:-}" ] && printf '%s★ %s%s  %s(URL Workspace aktif)%s\t%s\n' "$C_ACCENT$C_BOLD" "$WS_URL" "$C_RESET" "$C_MUTED" "$C_RESET" "$WS_URL"
         printf '%shttps://example.com%s  %s(URL uji standar)%s\thttps://example.com\n' "$C_OK" "$C_RESET" "$C_MUTED" "$C_RESET"
         printf '%shttp://127.0.0.1%s  %s(server lokal)%s\thttp://127.0.0.1\n' "$C_CYAN" "$C_RESET" "$C_MUTED" "$C_RESET"
         if [ -s "$TARGET_HISTORY_FILE" ]; then
@@ -307,9 +313,12 @@ smart_missing_advisor() {
   printf '  %s%s%s\n\n' "$C_PRIMARY" "$hint" "$C_RESET"
   if [ -n "$cat" ]; then
     printf '  %sAlternatif terpasang di kategori %s:%s\n' "$C_MUTED" "${CAT_NAMES[$cat]:-$cat}" "$C_RESET"
-    awk -F'|' -v c="$cat" '!/^#/ && $1==c {print $3 "|" $4}' "$TOOLS_FILE" | while IFS='|' read -r l b; do
-      have "$b" && printf '    %s✓%s %s (%s)\n' "$C_OK" "$C_RESET" "$l" "$b"
-    done
+    local tf
+    while IFS= read -r tf; do
+      awk -F'|' -v c="$cat" '!/^#/ && $1==c {print $3 "|" $4}' "$tf" | while IFS='|' read -r l b; do
+        have "$b" && printf '    %s✓%s %s (%s)\n' "$C_OK" "$C_RESET" "$l" "$b"
+      done
+    done < <(tools_files)
   fi
   if copy_to_clipboard "$hint"; then
     printf '\n'
@@ -320,24 +329,28 @@ smart_missing_advisor() {
 
 smart_command_builder() {
   local id="$1" line cat label binary template desc help sudo arg_prompt mode examples
-  local file sel choice cmd final_cmd ans
+  local file sel choice cmd final_cmd ans sf fcount
   line="$(find_tool_line "$id")"
   [ -n "$line" ] || { err "Tool tidak ditemukan: $id"; pause; return 1; }
   IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
   have "$binary" || { smart_missing_advisor "$binary" "$label" "$cat"; return 1; }
 
+  fcount="$(knowledge_flag_count "$id" 2>/dev/null || echo 0)"
   file="$(mktemp)"
   {
-    if [ -s "$SNIPPETS_FILE" ]; then
-      awk -F'\t' -v tid="$id" '!/^#/ && $1==tid {printf "\033[36m⌘\033[0m  %-34s \033[2m%s\033[0m\t%s\n", $2, $3, $3}' "$SNIPPETS_FILE"
+    if [ "$fcount" -gt 0 ]; then
+      printf '%s🧩%s Rakit dari Flag Resmi (%s flag terkurasi)\t__FLAG_BUILDER__\n' "$C_OK" "$C_RESET" "$fcount"
     fi
+    while IFS= read -r sf; do
+      awk -F'\t' -v tid="$id" '!/^#/ && $1==tid {printf "\033[36m⌘\033[0m  %-34s \033[2m%s\033[0m\t%s\n", $2, $3, $3}' "$sf"
+    done < <(snippets_files)
     printf '%s⚙%s  Template bawaan: %s\t%s\n' "$C_YELLOW" "$C_RESET" "${template:-$binary}" "${template:-$binary}"
     printf '%s✎%s  Tulis perintah kustom dari awal\t__CUSTOM__\n' "$C_ACCENT" "$C_RESET"
   } > "$file"
 
   sel="$(ui_fzf \
     --prompt='  Builder ▸ ' \
-    --ghost='Pilih preset perintah atau tulis kustom...' \
+    --ghost='Pilih Flag Builder, preset perintah, atau tulis kustom...' \
     --header="Command Builder: $label ($binary)" \
     --header-first \
     --header-label=' Smart Command Builder ' \
@@ -349,7 +362,10 @@ smart_command_builder() {
   [ -n "$sel" ] || return 0
 
   cmd="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
-  if [ "$cmd" = "__CUSTOM__" ]; then
+  if [ "$cmd" = "__FLAG_BUILDER__" ]; then
+    knowledge_flag_builder "$id"
+    return $?
+  elif [ "$cmd" = "__CUSTOM__" ]; then
     read -r -e -i "$binary " -p "Perintah: " cmd || true
     [ -n "$cmd" ] || { warn "Dibatalkan."; return 0; }
   else
@@ -368,21 +384,29 @@ smart_command_builder() {
   read -r -e -i "$cmd" -p "Edit perintah (Enter untuk lanjut): " final_cmd || true
   [ -n "$final_cmd" ] || { warn "Dibatalkan."; return 0; }
 
-  printf '\n  [r] Jalankan sekarang   [c] Salin ke clipboard   [d] Dry-run   [b] Batal\n'
-  read -r -p "Pilihan (R/c/d/b): " ans || true
+  printf '\n  [r] Jalankan sekarang   [c] Salin ke clipboard   [d] Dry-run   [s] Simpan ke Automation   [b] Batal\n'
+  read -r -p "Pilihan (R/c/d/s/b): " ans || true
   case "${ans:-r}" in
     c|C)
       if copy_to_clipboard "$final_cmd"; then ok "Disalin ke clipboard."; else printf '%s\n' "$final_cmd"; fi
       pause
       ;;
     d|D)
-      DRY_RUN=1 execute_command "$id" "$label" "$mode" "$sudo" "$final_cmd"
+      DRY_RUN=1 runner_exec "$id" "$label" "$mode" "$sudo" "$final_cmd"
+      ;;
+    s|S)
+      snippet_save_automation "$label (Builder)" "$final_cmd" "Dirakit dari Command Builder $label" "$sudo"
       ;;
     b|B)
       warn "Dibatalkan."
       ;;
     *)
-      execute_command "$id" "$label" "$mode" "$sudo" "$final_cmd"
+      if confirm_authorized_action "$id" "$final_cmd" "$sudo"; then
+        runner_exec "$id" "$label" "$mode" "$sudo" "$final_cmd"
+      else
+        warn "Dibatalkan."
+        pause
+      fi
       ;;
   esac
 }

@@ -320,17 +320,36 @@ recipe_wordlist_stats() {
 }
 
 recipe_laporan() {
-  local out count f
+  local out count f tmpl tfile tsel days
   out="$REPORT_DIR/laporan-$(date +%Y%m%d-%H%M%S).md"
+  tmpl="${1:-}"
+  if [ -z "$tmpl" ] && [ -t 0 ] && [ -t 1 ]; then
+    tfile="$(mktemp)"
+    {
+      printf '%s📄%s  Ringkas   %s(metadata + log 24 jam terakhir)%s\tringkas\n' "$C_PRIMARY" "$C_RESET" "$C_MUTED" "$C_RESET"
+      printf '%s📚%s  Lengkap   %s(semua log 7 hari + indeks per tool + flow)%s\tlengkap\n' "$C_ACCENT" "$C_RESET" "$C_MUTED" "$C_RESET"
+      printf '%s✅%s  Audit     %s(checklist temuan + rekomendasi tindak lanjut)%s\taudit\n' "$C_OK" "$C_RESET" "$C_MUTED" "$C_RESET"
+    } > "$tfile"
+    tsel="$(ui_fzf --prompt='  Template Laporan ▸ ' --header='Pilih template laporan Markdown' \
+      --footer='Enter: Pilih │ Esc: Ringkas' --delimiter=$'\t' --with-nth=1 < "$tfile")"
+    rm -f "$tfile"
+    tmpl="$(printf '%s\n' "$tsel" | awk -F'\t' '{print $2}')"
+  fi
+  tmpl="${tmpl:-ringkas}"
   if [ "$DRY_RUN" = "1" ]; then
-    warn "[DRY-RUN] Akan membuat laporan Markdown di: $out"
+    warn "[DRY-RUN] Akan membuat laporan Markdown (template: $tmpl) di: $out"
     pause
     return 0
   fi
   mkdir -p "$REPORT_DIR"
   smart_net_context
+  case "$tmpl" in
+    lengkap) days=7 ;;
+    audit) days=30 ;;
+    *) days=1 ;;
+  esac
   {
-    echo "# Laporan NetLauncher"
+    echo "# Laporan NetLauncher — ${tmpl^^}"
     echo
     echo "- Tanggal: $(date -Is)"
     echo "- Host: $NET_HOST"
@@ -338,8 +357,37 @@ recipe_laporan() {
     echo "- Interface: $NET_IFACE ($NET_IFACE_TYPE)"
     echo "- IP / Subnet: $NET_CIDR ($NET_SUBNET)"
     echo "- Gateway: $NET_GW"
+    echo "- Target Workspace: $(workspace_active_label 2>/dev/null || echo '-')"
     echo
-    echo "## Log 24 Jam Terakhir"
+
+    if [ "$tmpl" = "audit" ]; then
+      echo "## Checklist Audit & Rekomendasi"
+      echo
+      echo "| Item | Status | Catatan |"
+      echo "| --- | --- | --- |"
+      echo "| Otorisasi target | ☐ | Pastikan izin tertulis masih berlaku |"
+      echo "| Log eksekusi | $([ -n "$(find "$LOG_DIR" -type f -name '*.log' -mtime -$days 2>/dev/null | head -n 1)" ] && echo ☑ || echo ☐) | $(find "$LOG_DIR" -type f -name '*.log' -mtime -$days 2>/dev/null | wc -l | tr -d ' ') log dalam $days hari |"
+      echo "| Temuan error | ☐ | Tinjau baris error/denied pada log di bawah |"
+      echo "| Tindak lanjut | ☐ | Catat owner & tenggat perbaikan |"
+      echo
+      echo "### Baris Indikatif Error / Peringatan"
+      echo
+      echo '```text'
+      grep -riE 'error|failed|denied|refused|expired|warning|critical' "$LOG_DIR" --include='*.log' -m 3 2>/dev/null | head -n 60 || echo '(tidak ada)'
+      echo '```'
+      echo
+    fi
+
+    if [ "$tmpl" = "lengkap" ]; then
+      echo "## Indeks Log"
+      echo
+      echo '```text'
+      find "$LOG_DIR" -type f -name '*.log' -mtime -$days 2>/dev/null | sort -r | wc -l
+      echo '```'
+      echo
+    fi
+
+    echo "## Log $days Hari Terakhir"
     echo
     count=0
     while IFS= read -r f; do
@@ -351,10 +399,11 @@ recipe_laporan() {
       cat "$f"
       echo '```'
       echo
-    done < <(find "$LOG_DIR" -type f -mtime -1 2>/dev/null | sort -r | head -n 30)
+    done < <(find "$LOG_DIR" -type f -name '*.log' -mtime -$days 2>/dev/null | sort -r | head -n 60)
     echo "Total log: $count"
   } > "$out"
-  ok "Laporan dibuat: $out"
+  chmod 600 "$out" 2>/dev/null || true
+  ok "Laporan dibuat: $out (template: $tmpl)"
   pause
 }
 
@@ -489,13 +538,15 @@ automation_menu() {
     printf '%s←%s   Kembali\t__BACK__\n' "$C_MUTED" "$C_RESET"
   } > "$file"
 
+  printf '%s🌊%s  Kelola Automation Flow (.flow)\t__FLOW__\n' "$C_CYAN" "$C_RESET" >> "$file"
+
   sel="$(ui_fzf \
     --prompt='  Automation ▸ ' \
-    --ghost='Pilih script automation atau buat baru...' \
-    --header="Direktori: $AUTOMATIONS_DIR" \
+    --ghost='Pilih script automation, flow, atau buat baru...' \
+    --header="Direktori: $AUTOMATIONS_DIR │ Flow: $FLOWS_DIR" \
     --header-first \
     --header-label=' Custom Automation Scripts ' \
-    --list-label=' Daftar Script ' \
+    --list-label=' Daftar Script & Flow ' \
     --preview="$SELF --preview-automation {2}" \
     --preview-window='right:56%:wrap' \
     --preview-label=' Isi Script ' \
@@ -508,6 +559,7 @@ automation_menu() {
   case "$choice" in
     __BACK__) return 0 ;;
     __NEW__) automation_create; return 0 ;;
+    __FLOW__) flow_ui; return 0 ;;
   esac
 
   file="$(mktemp)"

@@ -1,0 +1,43 @@
+[flow]
+id = inventaris-port-lokal
+name = Inventaris Port & Proses Lokal
+category = interface
+risk = pasif
+requires_auth = false
+sudo = false
+description = Kumpulkan statistik socket, port TCP/UDP listening, koneksi ESTABLISHED, dan proses pemilik socket.
+tools = ss,lsof
+
+[inputs]
+
+[step:1]
+title = Ringkasan Statistik Socket
+tool = ss
+when = have:ss
+parser = net
+on_error = continue
+cmd = ss -s
+
+[step:2]
+title = Port Listening TCP & UDP
+tool = ss
+when = have:ss
+parser = sockets
+on_error = continue
+cmd = ss -tulpn
+
+[step:3]
+title = Koneksi Aktif ESTABLISHED
+tool = ss
+when = have:ss
+parser = net
+on_error = continue
+cmd = ss -tunap state established
+
+[step:4]
+title = Proses Pemilik Socket (LSOF)
+tool = lsof
+when = have:lsof
+parser = sockets
+on_error = continue
+cmd = lsof -i -P -n | head -n 40

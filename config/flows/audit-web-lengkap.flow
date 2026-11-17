@@ -1,0 +1,72 @@
+[flow]
+id = audit-web-lengkap
+name = Audit Web & TLS Lengkap (Pasif)
+category = dns
+risk = pasif
+requires_auth = false
+sudo = false
+description = Pipeline audit web pasif: HTTP security headers, timing, sertifikat TLS, DNS, reverse PTR, WhatWeb, dan HTTPX Toolkit.
+tools = curl,openssl,dig,whatweb,httpx-toolkit
+
+[inputs]
+URL = URL target berizin (mis. https://example.com)
+
+[step:1]
+title = HTTP Headers & Security Headers
+tool = curl
+when = have:curl
+parser = http_headers
+on_error = continue
+cmd = curl -ILsS --max-time 10 {URL}
+
+[step:2]
+title = Benchmark Timing HTTP/TLS
+tool = curl
+when = have:curl
+parser = generic
+on_error = continue
+cmd = curl -o /dev/null -sS --max-time 10 -w "HTTP=%{http_code} DNS=%{time_namelookup}s Connect=%{time_connect}s TLS=%{time_appconnect}s TTFB=%{time_starttransfer}s Total=%{time_total}s\n" {URL}
+
+[step:3]
+title = Inspeksi Sertifikat TLS
+tool = openssl
+when = have:openssl;var:DOMAIN
+parser = tls
+timeout = 10
+on_error = continue
+cmd = echo | openssl s_client -servername {DOMAIN} -connect {DOMAIN}:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates -ext subjectAltName
+
+[step:4]
+title = Resolusi DNS Domain
+tool = dig
+when = have:dig;var:DOMAIN
+parser = dns
+capture = RESOLVED_IP=grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1
+on_error = continue
+cmd = dig +noall +answer {DOMAIN} A {DOMAIN} AAAA {DOMAIN} TXT
+
+[step:5]
+title = Reverse DNS IP Terdeteksi
+tool = dig
+when = have:dig;var:RESOLVED_IP
+parser = dns
+on_error = continue
+cmd = dig -x {RESOLVED_IP} +short
+
+[step:6]
+title = Fingerprint Teknologi (WhatWeb)
+tool = whatweb
+when = have:whatweb
+parser = generic
+timeout = 15
+on_error = continue
+cmd = whatweb -a 1 --no-errors {URL}
+
+[step:7]
+title = Probe HTTPX Toolkit
+tool = httpx
+when = have:httpx-toolkit
+parser = generic
+timeout = 15
+on_error = continue
+cmd = printf '%s\n' {URL} | httpx-toolkit -status-code -title -tech-detect -ip -cdn -silent

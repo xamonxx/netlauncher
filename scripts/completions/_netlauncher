@@ -1,0 +1,74 @@
+#compdef netlauncher
+# Zsh completion untuk NetLauncher v2.1.0
+
+_netlauncher() {
+  local -a commands subcmds themes recipes
+  commands=(
+    'search:Pencarian global tool & contoh'
+    'examples:Browser contoh perintah'
+    'snippets:Alias examples'
+    'guide:Panduan resmi tool'
+    'flags:Interactive Flag Builder'
+    'flow:Automation Flow (.flow)'
+    'workspace:Target Workspace'
+    'automation:Custom automation scripts'
+    'wordlists:Browser/index wordlist'
+    'logs:Viewer log sesi & laporan'
+    'theme:Ubah tema & animasi'
+    'tool:Jalankan tool berdasarkan id'
+    'recipe:Jalankan resep aman'
+    'list:Daftar tool registry'
+    'doctor:Cek dependensi & tool'
+    'selftest:Validasi registry & file'
+    'lint:Validasi seluruh konfigurasi'
+    'update:Update ecosystem'
+    'help:Panduan lengkap'
+  )
+  subcmds=(
+    'list:Daftar flow'
+    'show:Lihat rencana flow'
+    'run:Jalankan flow'
+  )
+  themes=(cyber tokyo emerald amber)
+  recipes=(
+    cek-koneksi info-jaringan audit-web dns monitor-port
+    discovery-lokal scan-target capture wordlist-stats laporan
+  )
+
+  _arguments -C \
+    '--no-anim[Matikan animasi]' \
+    '--dry-run[Pratinjau tanpa eksekusi]' \
+    '--theme=[Tema sementara]:tema:(${themes})' \
+    '--version[Tampilkan versi]' \
+    '--help[Tampilkan bantuan]' \
+    '1:command:->command' \
+    '*::arg:->args'
+
+  case "$state" in
+    command)
+      _describe 'command' commands
+      ;;
+    args)
+      case "$words[1]" in
+        flow) _describe 'subcommand flow' subcmds ;;
+        workspace)
+          _values 'subcommand workspace' 'show' 'set' 'clear'
+          ;;
+        theme) _values 'tema' ${themes} ;;
+        recipe) _values 'resep' ${recipes} ;;
+        tool)
+          local -a tool_ids
+          tool_ids=(${(f)"$(_call_program tools "${words[1]}" list 2>/dev/null | awk 'NR>1{print $2}')"})
+          _describe 'tool id' tool_ids
+          ;;
+        guide|flags|examples|snippets)
+          local -a ids
+          ids=(${(f)"$(netlauncher list 2>/dev/null | awk 'NR>1{print $2}')"})
+          _describe 'tool id' ids
+          ;;
+      esac
+      ;;
+  esac
+}
+
+compdef _netlauncher netlauncher

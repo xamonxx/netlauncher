@@ -1,6 +1,6 @@
 # category|id|label|binary|template|description|help|sudo|arg_prompt|mode|examples
 diagnostik|ping|Ping|ping|ping -c 4 %s|Uji jangkauan host dan latensi via ICMP.|ping -h|0|Host/target|term|ping -c 4 1.1.1.1
-diagnostik|traceroute|Traceroute|traceroute|traceroute %s|Lacak rute hop paket menuju host.|traceroute -h|0|Host/target|term|traceroute example.com
+diagnostik|traceroute|Traceroute|traceroute|traceroute %s|Lacak rute hop paket menuju host.|traceroute --help|0|Host/target|term|traceroute example.com
 diagnostik|curl|Curl|curl|curl -ILsS %s|Cek header HTTP/HTTPS, redirect, dan timing.|curl --help|0|URL|term|curl -ILsS https://example.com
 diagnostik|wget|Wget|wget|wget --spider -S %s|Cek ketersediaan URL atau unduh file.|wget --help|0|URL|term|wget --spider -S https://example.com
 diagnostik|whois|Whois|whois|whois %s|Cek informasi registrasi domain, ASN, dan IP.|whois --help|0|Domain/IP|term|whois example.com
@@ -10,13 +10,13 @@ diagnostik|socat|Socat|socat|socat -h|Relay data dan diagnostik socket serbaguna
 dns|dig|Dig|dig|dig %s|Query DNS lengkap (A, AAAA, MX, NS, TXT).|dig -h|0|Domain|term|dig +short A example.com
 dns|nslookup|Nslookup|nslookup|nslookup %s|Query DNS interaktif dan cek resolver.|man nslookup|0|Domain|term|nslookup example.com
 dns|whatweb|WhatWeb|whatweb|whatweb %s|Fingerprint teknologi web, CMS, dan server.|whatweb --help|0|URL|term|whatweb https://example.com
-dns|nikto|Nikto|nikto|nikto -h %s|Scan konfigurasi dan kerentanan web (berizin).|nikto -help|0|URL|term|nikto -h https://example.com
+dns|nikto|Nikto|nikto|nikto -h %s|Scan konfigurasi dan kerentanan web (berizin).|nikto -H|0|URL|term|nikto -h https://example.com
 dns|gobuster|Gobuster|gobuster||Enumerasi direktori, vhost, atau DNS (berizin).|gobuster --help|0||term|gobuster dir -u http://127.0.0.1 -w ~/wordlists/indonesian/geovedi/00-indonesian-wordlist.lst
 dns|ffuf|FFUF|ffuf||Fuzzing web cepat untuk direktori/parameter (berizin).|ffuf -h|0||term|ffuf -u http://127.0.0.1/FUZZ -w /usr/share/dirb/wordlists/common.txt
 dns|feroxbuster|Feroxbuster|feroxbuster||Enumerasi konten web rekursif cepat (berizin).|feroxbuster --help|0||term|feroxbuster -u http://127.0.0.1 -w /usr/share/dirb/wordlists/common.txt
 dns|dirb|Dirb|dirb||Scanner direktori web berbasis wordlist (berizin).|dirb|0||term|dirb http://127.0.0.1 /usr/share/dirb/wordlists/common.txt
 dns|wfuzz|Wfuzz|wfuzz||Web fuzzer fleksibel untuk audit aplikasi (berizin).|wfuzz --help|0||term|wfuzz -c -z file,/usr/share/dirb/wordlists/common.txt --hc 404 http://127.0.0.1/FUZZ
-dns|httpx|HTTPX|httpx||Probe HTTP/HTTPS massal, status, dan title.|httpx -h|0||term|httpx -u https://example.com -status-code -title -tech-detect
+dns|httpx|HTTPX|httpx-toolkit||Probe HTTP/HTTPS massal, status, dan title.|httpx-toolkit -h|0||term|httpx-toolkit -u https://example.com -status-code -title -tech-detect
 dns|nuclei|Nuclei|nuclei||Scan kerentanan berbasis template YAML (berizin).|nuclei -h|0||term|nuclei -u https://example.com -severity medium,high,critical
 dns|amass|Amass|amass||OSINT dan pemetaan subdomain (target berizin).|amass -h|0||term|amass enum -passive -d example.com
 dns|sqlmap|SQLMap|sqlmap||Audit dan deteksi SQL injection (target berizin).|sqlmap -h|0||term|sqlmap -u "http://127.0.0.1/item?id=1" --batch --banner
@@ -38,7 +38,7 @@ scan|tshark|TShark|tshark|sudo tshark -i %s -c 25|Analisis paket CLI dari Wiresh
 scan|tcpflow|TCPFlow|tcpflow|sudo tcpflow -i %s -c|Rekonstruksi aliran data TCP (butuh sudo).|tcpflow -h|1|Interface|term|sudo tcpflow -i wlan0 -c port 80
 scan|ngrep|Ngrep|ngrep|sudo ngrep -d %s -q|Pencarian pola teks pada paket jaringan (sudo).|ngrep -h|1|Interface|term|sudo ngrep -d wlan0 -q 'HTTP' port 80
 scan|wireshark|Wireshark|wireshark|wireshark|GUI analisis paket mendalam (butuh display).|wireshark --help|0||gui|wireshark
-wireless|airmon-ng|Airmon-ng|airmon-ng|sudo airmon-ng|Lihat dan kelola antarmuka monitor wireless.|airmon-ng --help|1||term|sudo airmon-ng
+wireless|airmon-ng|Airmon-ng|airmon-ng|sudo airmon-ng|Lihat dan kelola antarmuka monitor wireless.|man airmon-ng|1||term|sudo airmon-ng
 wireless|aircrack-ng|Aircrack-ng|aircrack-ng|sudo aircrack-ng|Suite audit keamanan WiFi (jaringan berizin).|aircrack-ng --help|1||term|sudo aircrack-ng --help
 wireless|kismet|Kismet|kismet|sudo kismet|Deteksi wireless, spektrum, dan WIDS (berizin).|kismet --help|1||term|sudo kismet
 wireless|reaver|Reaver|reaver|sudo reaver|Tool audit WPS pada jaringan berizin.|reaver --help|1||term|sudo reaver --help

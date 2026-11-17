@@ -63,6 +63,17 @@ ln -sfn ../MEMORY.md "$CONFIG_REPO/MEMORY.md"
 ln -sfn "$REPO/MEMORY.md" "$MEMORY_LINK"
 ok "memory ditautkan: $MEMORY_LINK"
 
+# --- completions (opsional, tanpa sudo) ---
+BASH_COMP="$HOME/.local/share/bash-completion/completions"
+ZSH_COMP="$HOME/.local/share/zsh/site-functions"
+mkdir -p "$BASH_COMP" "$ZSH_COMP"
+if [ -f "$REPO/scripts/completions/netlauncher.bash" ]; then
+  cp -f "$REPO/scripts/completions/netlauncher.bash" "$BASH_COMP/netlauncher" && ok "completion bash dipasang"
+fi
+if [ -f "$REPO/scripts/completions/_netlauncher" ]; then
+  cp -f "$REPO/scripts/completions/_netlauncher" "$ZSH_COMP/_netlauncher" && ok "completion zsh dipasang"
+fi
+
 # --- state runtime ---
 touch "$CONFIG_REPO/favorites.tsv" 2>/dev/null || true
 touch "$DATA_DIR/history.log" 2>/dev/null || true

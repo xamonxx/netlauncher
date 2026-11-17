@@ -1,13 +1,14 @@
-# NetLauncher v2.0.0 — Panduan Penggunaan
+# NetLauncher v2.1.0 — Panduan Penggunaan
 
 Smart Network & Security Command Center berbasis terminal (`Bash + fzf 0.75`)
-untuk Kali Linux. Dilengkapi UI modern truecolor, animasi terminal, deteksi
-konteks jaringan otomatis, 104 contoh perintah siap pakai, Command Builder,
-Custom Automation Scripts, dan 10 resep otomasi aman.
+untuk Kali Linux. UI modern truecolor, animasi terminal, deteksi konteks jaringan
+otomatis, 104 contoh perintah, Knowledge Base resmi + Flag Builder, 205 flag
+terkurasi, 27 panduan resmi Bahasa Indonesia, Automation Flow (`.flow`),
+Target Workspace, Modern Execution Runner, dan 10 resep otomasi aman.
 
 > **Gunakan hanya pada aset/jaringan yang Anda miliki atau punya izin tertulis.**
 > Launcher ini membuka tool yang sudah terpasang. Tidak ada otomasi serangan
-> (deauth, handshake capture, brute-force) di dalam resep maupun snippet bawaan.
+> (deauth, handshake capture, brute-force) di dalam resep, snippet, maupun flow.
 
 ## Navigasi & Shortcut
 
@@ -20,9 +21,13 @@ Custom Automation Scripts, dan 10 resep otomasi aman.
 | `Ctrl-/` | Tampilkan/sembunyikan panel preview |
 | `Ctrl-S` | Pencarian global (51 tool + 104 contoh perintah) |
 | `Ctrl-E` | Browser Contoh Perintah & Code Snippets |
+| `Ctrl-K` | Knowledge Base Resmi & Interactive Flag Builder |
+| `Ctrl-W` | Target Workspace |
 | `Ctrl-T` | Pengaturan Tema & Animasi |
 | `Ctrl-L` | Riwayat Perintah & Log Sesi Viewer |
 | `Ctrl-C` | Keluar dari fzf |
+
+`Tab` pada Flag Builder memilih beberapa flag sekaligus sebelum merakit perintah.
 
 ## Kategori (51 Tool Terpasang)
 
@@ -36,52 +41,66 @@ Custom Automation Scripts, dan 10 resep otomasi aman.
 
 ## Fitur Pintar & Modern UI
 
-- **Splash & Animasi Terminal**: banner ASCII, progress bar, dan spinner murni Bash (otomatis nonaktif di non-TTY atau dengan `--no-anim`).
-- **4 Tema Truecolor**: `cyber` (default), `tokyo`, `emerald`, dan `amber` — ubah lewat menu `Tema & Animasi` (`Ctrl-T`) atau `netlauncher theme <nama>`.
-- **Smart Network Context**: mendeteksi otomatis interface aktif, IP/CIDR, subnet, gateway, DNS, SSID WiFi, dan status koneksi (`ONLINE`/`LOKAL`/`OFFLINE`).
-- **Smart Placeholder Picker**: saat menjalankan tool atau snippet dengan `{TARGET}`, `{SUBNET}`, `{IFACE}`, `{DOMAIN}`, `{URL}`, `{PORT}`, `{WORDLIST}`, atau `{FILE}`, launcher menyarankan nilai kontekstual dan riwayat target terakhir.
-- **Command Builder**: pilih preset snippet atau template, isi parameter pintar, edit perintah sebelum eksekusi, lalu jalankan, salin ke clipboard, atau uji dengan `--dry-run`.
-- **Missing Tool Advisor**: jika binary belum terpasang, tampilkan saran instalasi dan alternatif tool yang sudah terpasang di kategori yang sama.
+- **Splash & Animasi Terminal**: banner ASCII, progress bar, dan spinner murni Bash (otomatis nonaktif di non-TTY atau `--no-anim`).
+- **4 Tema Truecolor**: `cyber` (default), `tokyo`, `emerald`, `amber` — ubah lewat `Ctrl-T` atau `netlauncher theme <nama>`. Border fzf menampilkan versi, tema, dan workspace aktif.
+- **Smart Network Context**: mendeteksi interface, IP/CIDR, subnet, gateway, DNS, SSID WiFi, dan status koneksi.
+- **Smart Placeholder Picker**: saran kontekstual untuk `{TARGET}`, `{SUBNET}`, `{IFACE}`, `{DOMAIN}`, `{URL}`, `{PORT}`, `{WORDLIST}`, `{FILE}`, `{QUERY}` — kini mengutamakan nilai Target Workspace.
+- **Modern Execution Runner**: setiap perintah dijalankan lewat PTY (`script -qefc` saat TTY, `tee` + `PIPESTATUS[0]` saat non-TTY) sehingga warna/interactive prompt tetap terjaga, exit code tepat, dan log tetap teks polos. Setelah eksekusi tersedia Ringkasan Temuan (parser ping/nmap/HTTP/TLS/DNS/socket/fuzz/vuln), Filter Output (fzf), pager, salin, ekspor Markdown, saran langkah berikutnya, dan jalankan ulang.
+- **Knowledge Base Resmi** (`Ctrl-K` / `netlauncher guide [tool_id]`): 27 panduan resmi Bahasa Indonesia, referensi 205 flag terkurasi, dan ekstrak flag langsung dari `--help`/`man` lokal.
+- **Interactive Flag Builder** (`netlauncher flags <tool_id>`): pilih banyak flag dengan `Tab`, isi argumen/placeholder, normalisasi subcommand wajib (mis. `gobuster dir`, `openssl s_client -connect`, `amass enum`), lalu jalankan/salin/dry-run/simpan automation.
+- **Command Builder**: preset snippet, template, Flag Builder resmi, edit, jalankan dengan konfirmasi otorisasi.
+- **Target Workspace** (`Ctrl-W` / `netlauncher workspace`): simpan `TARGET`, `DOMAIN`, `URL`, `SUBNET`, `IFACE`, `NOTE` di `~/.local/share/netlauncher/workspace.env`; dipakai otomatis oleh smart picker, flow, dan advisor.
+- **Missing Tool Advisor**: saran instalasi dan alternatif tool terpasang.
 
 ## Contoh Perintah & Custom Automation
 
-- **104 Code Snippets (`config/snippets.tsv`)**: mencakup seluruh 51 tool. Dari menu snippet (`Ctrl-E` atau `netlauncher examples [tool_id]`), Anda dapat:
-  - Menjalankan dengan Smart Fill parameter
-  - Mengedit perintah sebelum dijalankan
-  - Menyalin perintah ke clipboard
-  - Menyimpan snippet menjadi script Bash di `~/.config/netlauncher/automations/`
-  - Menjalankan pratinjau `--dry-run`
-- **Custom Automation (`~/.config/netlauncher/automations/*.sh`)**: dilengkapi 4 script starter (`healthcheck-harian.sh`, `audit-tls-domain.sh`, `inventaris-port.sh`, `discovery-subnet-aman.sh`) serta menu untuk membuat, mengedit, dan menjalankan script Bash kustom Anda sendiri.
+- **104 Code Snippets (`config/snippets.tsv`)**: jalankan dengan Smart Fill, edit, salin, simpan ke automation, atau `--dry-run`.
+- **Custom Automation Scripts** (`~/.config/netlauncher/automations/*.sh`): 4 starter script + menu buat/edit/jalankan.
+- **Automation Flow** (`~/.config/netlauncher/flows/*.flow`): 6 starter flow deklaratif
+  (`healthcheck-harian`, `audit-web-lengkap`, `inventaris-port-lokal`,
+  `discovery-subnet-aman`, `audit-dns-mendalam`, `diagnostik-wifi-link`).
+  Format INI: `[flow]`, `[inputs]`, `[step:N]` dengan `title`, `tool`, `when`
+  (`have:`, `var:`, `prev_ok`, `confirm:`, digabung `;`), `parser`, `on_error`,
+  `timeout`, `capture`, dan `cmd`. Variabel memakai `{NAMA}`; hasil `capture`
+  dapat dipakai langkah berikutnya. Dashboard + ekspor Markdown otomatis.
 
 ## Perintah CLI
 
 ```bash
-netlauncher                       # buka menu utama interaktif
-netlauncher search                # pencarian global tool & contoh perintah
-netlauncher examples [tool_id]    # browser contoh perintah & code snippets
-netlauncher snippets [tool_id]    # alias untuk examples
-netlauncher automation            # kelola & jalankan custom automation scripts
+netlauncher                       # menu utama interaktif
+netlauncher search                # pencarian global
+netlauncher examples [tool_id]    # browser contoh perintah
+netlauncher snippets [tool_id]    # alias examples
+netlauncher guide [tool_id]       # panduan resmi (cetak ke stdout bila non-TTY)
+netlauncher flags [tool_id]       # Interactive Flag Builder
+netlauncher flow [ui|list|show|run]  # Automation Flow
+netlauncher workspace [show|set|clear]  # Target Workspace
+netlauncher automation            # kelola custom automation scripts
 netlauncher wordlists [refresh]   # browser / refresh index wordlist
-netlauncher logs                  # buka viewer log sesi
+netlauncher logs                  # viewer log sesi & laporan
 netlauncher theme [nama]          # ubah tema (cyber|tokyo|emerald|amber)
-netlauncher tool <id>             # jalankan tool langsung
+netlauncher tool <id> [argumen]   # jalankan tool lewat runner modern
 netlauncher recipe <nama>         # jalankan resep otomasi aman
 netlauncher list [--json]         # daftar semua tool (tabel atau JSON)
 netlauncher doctor                # cek dependensi, terminal, dan tool
 netlauncher selftest              # validasi registry, snippet, dan file
-netlauncher lint                  # validasi ketat tools.tsv, snippets.tsv, syntax
+netlauncher lint                  # validasi tools/snippets/flags/guides/flow & syntax
 netlauncher update                # update hackingtool + index wordlist
 netlauncher help                  # panduan ini
-netlauncher --version             # tampilkan versi
-netlauncher --help                # bantuan CLI singkat
+netlauncher --version
+netlauncher --help
 ```
 
-Opsi global:
+Opsi global: `--no-anim`, `--dry-run`, `--theme <nama>`.
+
+Contoh Automation Flow:
 
 ```bash
-netlauncher --no-anim             # matikan animasi splash/spinner
-netlauncher --dry-run ...         # pratinjau perintah tanpa eksekusi
-netlauncher --theme tokyo         # pakai tema sementara
+netlauncher flow list
+netlauncher flow show audit-web-lengkap
+netlauncher --dry-run flow run audit-web-lengkap --var URL=https://example.com
+netlauncher flow run healthcheck-harian
+netlauncher workspace set DOMAIN=example.com SUBNET=192.168.1.0/24
 ```
 
 ## Resep Otomasi Aman (10 Resep)
@@ -97,53 +116,69 @@ netlauncher --theme tokyo         # pakai tema sementara
 | `scan-target` | Nmap (Top 100 / Service+NSE / Full TCP) + konfirmasi | tidak |
 | `capture` | `tcpdump` dengan smart interface picker & filter BPF | ya |
 | `wordlist-stats` | Jumlah baris, ukuran, cuplikan, dan baris unik | tidak |
-| `laporan` | Gabungkan log 24 jam terakhir ke Markdown di `~/laporan/` | tidak |
+| `laporan` | 3 template: ringkas / lengkap / audit → `~/laporan/` | tidak |
+
+## Overlay Lokal (tidak di-track)
+
+Letakkan file berikut di `~/.config/netlauncher/` (symlink ke repo config) untuk
+menambah data tanpa mengubah repo:
+
+- `tools.local.tsv` — format sama dengan `tools.tsv`
+- `snippets.local.tsv` — format sama dengan `snippets.tsv`
+- `flows.local/*.flow` — flow pribadi
+
+Semua overlay digabung dengan data bawaan saatlint, pencarian, menu, dan
+`list --json`. File ini masuk `.gitignore` agar tidak ikut ter-commit.
 
 ## Wordlist
 
-Wordlist yang terintegrasi (136 entri):
-
-- `~/wordlists/rockyou.txt`
-- `~/wordlists/indonesian/geovedi/*.lst` — public domain
-- `~/wordlists/indonesian/kbbi/all_entries_v6.1.0.txt` — KBBI v6.1.0
-- `~/wordlists/indonesian/elliottophellia/rei-indonesia-wordlist.txt` — CC BY-SA 4.0
-- `~/wordlists/indonesian/indonesian-pwdb-top150.txt` — SecLists
-- SecLists, dirb, dirbuster, john, nmap, sqlmap, wfuzz, metasploit, fern-wifi
+Wordlist yang terintegrasi (136 entri): rockyou, SecLists, dan 4 koleksi
+wordlist Indonesia (geovedi, KBBI v6.1.0, REI, SecLists ID).
 
 ## Favorit, Riwayat, dan Log
 
-- Tambah/hapus favorit dari menu aksi tool.
-- Riwayat perintah disimpan di `~/.local/share/netlauncher/history.log`.
-- Riwayat target kontekstual disimpan di `~/.local/share/netlauncher/targets.history`.
-- Log per sesi disimpan di `~/.local/share/netlauncher/logs/` (permission `700`, rotasi otomatis > 30 hari).
+- Favorit dari menu aksi tool.
+- Riwayat: `~/.local/share/netlauncher/history.log`.
+- Riwayat target: `~/.local/share/netlauncher/targets.history`.
+- Workspace: `~/.local/share/netlauncher/workspace.env`.
+- Log sesi: `~/.local/share/netlauncher/logs/` (permission `700`, rotasi > 30 hari).
+- Laporan: `~/laporan/` (permission `600`).
 
 ## Troubleshooting
 
 **fzf tidak ditemukan / versi lama**
-
 ```bash
 GOBIN="$HOME/.local/bin" go install github.com/junegunn/fzf@latest
 ```
 
 **hackingtool tidak ditemukan**
-
 ```bash
 pipx install ~/tools/hackingtool --force
 pipx ensurepath
 ```
 
 **Warna/UI tidak tampil normal**
+Pastikan terminal mendukung truecolor/ANSI (`TERM=xterm-256color`,
+`COLORTERM=truecolor`). Gunakan `netlauncher --no-anim` atau matikan animasi di
+menu `Tema & Animasi` (`Ctrl-T`).
 
-Pastikan terminal mendukung truecolor/ANSI (`TERM=xterm-256color`, `COLORTERM=truecolor`).
-Jika terminal lambat atau tidak mendukung animasi, jalankan `netlauncher --no-anim`
-atau matikan animasi lewat menu `Tema & Animasi` (`Ctrl-T`).
+**Eksekusi tampak tanpa warna di log**
+Itu disengaja: log disimpan sebagai teks polos. Warna asli tetap tampil di
+terminal dan bisa dilihat kembali lewat menu "Buka Output Lengkap di Pager
+(less -R)".
 
 ## Struktur File
 
 ```text
 ~/.local/bin/netlauncher
 ~/.config/netlauncher/tools.tsv
+~/.config/netlauncher/tools.local.tsv          (opsional)
 ~/.config/netlauncher/snippets.tsv
+~/.config/netlauncher/snippets.local.tsv       (opsional)
+~/.config/netlauncher/flags.tsv
+~/.config/netlauncher/guides/*.md
+~/.config/netlauncher/flows/*.flow
+~/.config/netlauncher/flows.local/*.flow       (opsional)
 ~/.config/netlauncher/automations/*.sh
 ~/.config/netlauncher/wordlists.tsv
 ~/.config/netlauncher/help.md
@@ -152,6 +187,7 @@ atau matikan animasi lewat menu `Tema & Animasi` (`Ctrl-T`).
 ~/.local/share/netlauncher/logs/
 ~/.local/share/netlauncher/history.log
 ~/.local/share/netlauncher/targets.history
+~/.local/share/netlauncher/workspace.env
 ~/.local/share/applications/netlauncher.desktop
 ~/wordlists/
 ~/laporan/

@@ -37,8 +37,8 @@ ffuf	Fuzzing vhost dengan header Host	ffuf -u {URL} -H 'Host: FUZZ.{DOMAIN}' -w 
 feroxbuster	Scan konten web rekursif (berizin)	feroxbuster -u {URL} -w {WORDLIST} -t 20 --depth 2 --no-state	Enumerasi direktori rekursif dengan kedalaman 2.	0	URL,WORDLIST
 dirb	Scan direktori standar (berizin)	dirb {URL} {WORDLIST} -S	Scan direktori klasik dengan output ringkas.	0	URL,WORDLIST
 wfuzz	Fuzzing direktori berwarna (berizin)	wfuzz -c -z file,{WORDLIST} --hc 404 {URL}/FUZZ	Sembunyikan 404 dan tampilkan respons valid.	0	URL,WORDLIST
-httpx	Probe URL + status + title + tech	printf '%s\n' {URL} | httpx -status-code -title -tech-detect -ip -cdn	Cek status HTTP, judul halaman, teknologi, dan IP.	0	URL
-httpx	Probe daftar domain dari file	httpx -l {FILE} -status-code -title -follow-redirects -silent	Uji banyak host dari file teks (satu domain per baris).	0	FILE
+httpx	Probe URL + status + title + tech	printf '%s\n' {URL} | httpx-toolkit -status-code -title -tech-detect -ip -cdn	Cek status HTTP, judul halaman, teknologi, dan IP.	0	URL
+httpx	Probe daftar domain dari file	httpx-toolkit -l {FILE} -status-code -title -follow-redirects -silent	Uji banyak host dari file teks (satu domain per baris).	0	FILE
 nuclei	Scan template misconfig & exposure (berizin)	nuclei -u {URL} -tags misconfig,exposure -severity low,medium,high	Jalankan template audit konfigurasi pada target berizin.	0	URL
 nuclei	Update template Nuclei	nuclei -update-templates	Perbarui koleksi template Nuclei resmi.	0	
 amass	Enumerasi subdomain pasif (berizin)	amass enum -passive -d {DOMAIN}	Kumpulkan subdomain dari sumber pasif tanpa menyentuh target.	0	DOMAIN

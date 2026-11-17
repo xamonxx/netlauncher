@@ -1,7 +1,7 @@
 # NetLauncher — Memory / Project Context
 
 - **Terakhir diperbarui:** 2026-11-17
-- **Versi aktif:** 2.0.0
+- **Versi aktif:** 2.1.0
 - **Status:** terpasang dan terverifikasi
 - **Repo / lokasi kanonik:** `~/tools/netlauncher/`
 - **File ini:** `~/tools/netlauncher/MEMORY.md`
@@ -73,19 +73,28 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 ├── Makefile                                # check/test/lint/install/backup/ui-test
 ├── bin/netlauncher                         # entrypoint CLI & menu loop (Bash)
 ├── lib/
-│   ├── core.sh                             # path, env override, helper, registry, target history
+│   ├── core.sh                             # path, overlay, workspace, helper, registry, target history
 │   ├── ui.sh                               # 4 tema truecolor, animasi, badge, wrapper fzf
+│   ├── runner.sh                           # PTY runner, parser output, post-run viewer, ekspor Markdown
 │   ├── smart.sh                            # konteks jaringan, smart picker, command builder, advisor
-│   ├── snippets.sh                         # browser & runner 104 contoh perintah
+│   ├── snippets.sh                         # browser & runner 104 contoh perintah (overlay-aware)
 │   ├── wordlists.sh                        # indexer & browser wordlist
+│   ├── knowledge.sh                        # 27 panduan resmi, 205 flag, flag builder, live --help/man
+│   ├── flow.sh                             # engine .flow, wizard, pipeline runner, dashboard
 │   ├── recipes.sh                          # 10 resep aman & custom automation scripts
-│   ├── menu.sh                             # menu utama, pencarian global, aksi tool, riwayat & log
+│   ├── menu.sh                             # menu utama, workspace, pencarian global, aksi tool, log
 │   └── doctor.sh                           # doctor, selftest, lint, list (--json), update, help
 ├── config/
 │   ├── tools.tsv                           # registry 51 tool, 11 field (delimiter |)
 │   ├── snippets.tsv                        # 104 contoh perintah, 6 field (delimiter tab)
+│   ├── flags.tsv                           # 205 flag resmi, 7 field (delimiter tab)
+│   ├── guides/                             # 27 panduan resmi Bahasa Indonesia (*.md)
+│   ├── flows/                              # 6 starter automation flow (*.flow)
 │   ├── automations/                        # 4 starter script + custom automation (*.sh)
 │   ├── help.md                             # panduan pengguna
+│   ├── tools.local.tsv                     # overlay lokal, tidak di-track
+│   ├── snippets.local.tsv                  # overlay lokal, tidak di-track
+│   ├── flows.local/                        # overlay lokal, tidak di-track
 │   ├── favorites.tsv                       # runtime, tidak di-track
 │   ├── wordlists.tsv                       # index 136 wordlist, tidak di-track
 │   ├── theme.env                           # runtime preferensi tema/animasi, tidak di-track
@@ -116,7 +125,8 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 ~/.local/share/netlauncher/
 ├── logs/                                   # log per sesi, permission 700, rotasi > 30 hari
 ├── history.log                             # riwayat perintah
-└── targets.history                         # riwayat target/domain/URL untuk Smart Picker
+├── targets.history                         # riwayat target/domain/URL untuk Smart Picker
+└── workspace.env                           # Target Workspace (TARGET/DOMAIN/URL/SUBNET/IFACE/NOTE)
 
 ~/wordlists/                                # wordlist lokal
 ├── README.md                               # sumber, lisensi, SHA256
@@ -133,7 +143,7 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 Permission penting:
 
 - `~/.local/share/netlauncher/` dan `logs/`: `700`
-- `history.log`, `targets.history`, `favorites.tsv`, `wordlists.tsv`, `theme.env`, log: `600`
+- `history.log`, `targets.history`, `workspace.env`, `favorites.tsv`, `wordlists.tsv`, `theme.env`, log, laporan: `600`
 
 ### Alur kerja repo
 
@@ -156,9 +166,9 @@ make backup                 # arsip script + konfigurasi
 
 ---
 
-## 4. Arsitektur Launcher (v2.0.0)
+## 4. Arsitektur Launcher (v2.1.0)
 
-`bin/netlauncher` adalah entrypoint ringan yang memuat 8 modul di `lib/*.sh`.
+`bin/netlauncher` adalah entrypoint ringan yang memuat 11 modul di `lib/*.sh`.
 Sumber kanonik ada di repo; path live `~/.local/bin/netlauncher` adalah symlink,
 sehingga edit di repo langsung berlaku tanpa menyalin ulang.
 
@@ -197,14 +207,20 @@ Total: **104 entri** mencakup seluruh 51 tool.
 - Splash screen ASCII animasi + progress bar + spinner murni Bash (`--no-anim` / `NETLAUNCHER_NO_ANIM=1` untuk menonaktifkan)
 - `fzf 0.75` `--style=full:rounded --border=rounded --height=100%` dengan panel Status Sistem, Pencarian, Daftar, Inspector Preview, dan Footer
 - 4 tema truecolor (`cyber`, `tokyo`, `emerald`, `amber`) dengan pratinjau palet langsung (`Ctrl-T`)
-- Shortcut menu utama: `Ctrl-S` (Global Search), `Ctrl-E` (Code Snippets), `Ctrl-T` (Tema & Animasi), `Ctrl-L` (Riwayat & Log)
+- Shortcut menu utama: `Ctrl-S` (Global Search), `Ctrl-E` (Code Snippets), `Ctrl-K` (Knowledge), `Ctrl-W` (Workspace), `Ctrl-T` (Tema & Animasi), `Ctrl-L` (Riwayat & Log)
 - Smart Network Context (`smart_net_context`): deteksi interface aktif, IP/CIDR, subnet, gateway, DNS, SSID WiFi, status `ONLINE`/`LOKAL`/`OFFLINE`
 - Smart Placeholder Picker (`smart_prompt_placeholder`): saran kontekstual + riwayat target untuk `{TARGET}`, `{SUBNET}`, `{IFACE}`, `{DOMAIN}`, `{URL}`, `{PORT}`, `{WORDLIST}`, `{FILE}`, `{QUERY}`
 - Command Builder (`smart_command_builder`): pilih preset/template, isi parameter pintar, edit perintah, jalankan / salin / dry-run
 - Missing Tool Advisor (`smart_missing_advisor`): saran instalasi + alternatif terpasang
 - Custom Automation Scripts (`config/automations/*.sh`): 4 starter script + buat/edit/jalankan script kustom
 - Browser wordlist: preview, salin path, buka di `less`, statistik
-- `doctor`, `selftest`, `lint`, `list --json`, `update`, `--dry-run`, `--no-anim`, `--theme`
+- **Modern Execution Runner** (`lib/runner.sh`): `script -qefc` pada TTY (warna + prompt interaktif + exit code tepat), `tee` + `PIPESTATUS[0]` pada non-TTY, log teks polos, parser `ping`/`nmap`/`http_headers`/`tls`/`dns`/`sockets`/`fuzz`/`vuln`/`net`/`capture`, post-run menu (filter/pager/salin/ekspor/saran/rerun)
+- **Knowledge Base** (`lib/knowledge.sh`): 27 panduan resmi, 205 flag di `config/flags.tsv`, `knowledge_flag_builder()` dengan `mapfile` (stdin aman untuk prompt), normalisasi subcommand wajib, dan live extractor `--help`/`man` (khusus `amass` memakai `man` agar tidak memicu unduhan libpostal via sudo)
+- **Automation Flow** (`lib/flow.sh`): format INI `[flow]`/`[inputs]`/`[step:N]`, `when` digabung `;`, `capture` variabel, `on_error`, `parser`, `timeout`, dashboard + ekspor Markdown. `flow_resolve_inputs()`turunan `DOMAIN` dari `URL` juga berlaku untuk `--var URL=...`
+- **Target Workspace** (`workspace.env`) diprioritaskan di Smart Picker, Flag Builder, dan advisor; shortcut `Ctrl-W` / `netlauncher workspace`
+- **Overlay**: `tools.local.tsv`, `snippets.local.tsv`, `flows.local/` digabung otomatis (semua masuk `.gitignore`)
+- Completion Bash (`scripts/completions/netlauncher.bash`) dan Zsh (`scripts/completions/_netlauncher`)
+- `doctor`, `selftest`, `lint` (juga memvalidasi flags/guides/flow), `list --json`, `update`, `--dry-run`, `--no-anim`, `--theme`
 - Desktop entry dan alias `net`
 
 ### Perintah CLI
@@ -214,6 +230,10 @@ netlauncher                       # menu utama
 netlauncher search                # pencarian global tool & contoh perintah
 netlauncher examples [tool_id]    # browser contoh perintah & code snippets
 netlauncher snippets [tool_id]    # alias untuk examples
+netlauncher guide [tool_id]       # panduan resmi (stdout bila non-TTY)
+netlauncher flags [tool_id]       # Interactive Flag Builder
+netlauncher flow [ui|list|show|run]
+netlauncher workspace [show|set|clear]
 netlauncher automation            # kelola & jalankan custom automation scripts
 netlauncher wordlists [refresh]   # browser / refresh wordlist
 netlauncher logs                  # viewer log sesi
@@ -280,6 +300,46 @@ Batasan:
 - Tidak ada otomasi deauth, handshake capture, atau brute-force.
 - Scan/capture meminta konfirmasi.
 - Resep hanya untuk target berizin.
+- `recipe_laporan` menyediakan 3 template: `ringkas` (log 24 jam), `lengkap` (7 hari + indeks), `audit` (checklist temuan + baris error).
+
+---
+
+## 5b. Knowledge, Flag Builder & Automation Flow (v2.1.0)
+
+### `config/flags.tsv` (205 entri, delimiter TAB, 7 field)
+
+```text
+tool_id	flag	arg_spec	category	risk	description_id	example
+```
+
+`risk` hanya `pasif|aman|aktif|sudo`. Field `arg_spec` boleh kosong; parser
+memakai `awk -F'\t'` karena `read` dengan `IFS=$'\t'` mengabaikan tab berurutan.
+Panduan ada di `config/guides/<id>.md` (fallback `ip-route`→`ip-addr`,
+`hashcat`→`john`).
+
+### Starter flow di `config/flows/`
+
+| ID | Risiko | Fungsi |
+| --- | --- | --- |
+| `healthcheck-harian` | aman | interface, ping GW/internet, DNS, HTTP timing |
+| `audit-web-lengkap` | pasif | headers, timing, TLS, DNS, PTR, WhatWeb, HTTPX |
+| `inventaris-port-lokal` | pasif | `ss` + `lsof` |
+| `discovery-subnet-aman` | aktif | ARP lokal + `nmap -sn` dengan `confirm:` |
+| `audit-dns-mendalam` | pasif | A/AAAA/MX/NS/TXT/SOA, SPF/DMARC, PTR, DNSSEC, WHOIS |
+| `diagnostik-wifi-link` | pasif | `ip`, `iw dev`, `nmcli`, `ethtool` |
+
+### Perbaikan kompatibilitas Kali yang sudah diterapkan
+
+- `httpx` di registry memakai binary **`httpx-toolkit`** (`/usr/bin/httpx` adalah `python3-httpx`).
+- `traceroute --help`, `nikto -H`, `man airmon-ng` sebagai perintah bantuan.
+- `nc` adalah `nc.traditional v1.10`: argumen host + port wajib dipisah (Flag Builder menambah keduanya).
+- `amass -h` memicu `sudo` untuk libpostal → live extractor memakai `man amass`.
+
+### Overlay & Workspace
+
+- Overlay: `tools.local.tsv`, `snippets.local.tsv`, `flows.local/*.flow` (di-`.gitignore`).
+- Workspace: `~/.local/share/netlauncher/workspace.env`, diisi via `Ctrl-W` atau `netlauncher workspace set K=V`.
+- Snippet ref kini `main:<baris>` / `local:<baris>` agar preview & aksi tidak tertukar saat overlay aktif.
 
 ---
 
@@ -311,12 +371,15 @@ Batasan:
 
 ## 7. Verifikasi yang Sudah Dilakukan
 
-- `make check` (`bash -n` semua script + `tests/smoke.sh`) → lolos
-- `netlauncher lint` → 51 tool unik, 104 snippet, 9 script syntax OK
+- `make check` (`bash -n` semua script + `tests/smoke.sh`) → lolos (107 asersi)
+- `netlauncher lint` → 51 tool, 104 snippet, 205 flag, 27 panduan, 6 flow, 11 modul syntax OK
 - `netlauncher selftest` → 51 entri & 104 snippet tanpa error
-- `netlauncher doctor` → komponen utama siap
-- `netlauncher list --json` → JSON valid 51 entri
-- `make ui-test` & tmux capture → menu utama, kategori, `Ctrl-E` snippets, `Ctrl-S` global search, `Ctrl-T` tema + preview, `Ctrl-L` riwayat + preview tampil normal
+- `netlauncher doctor` → komponen utama siap (flag/guide/flow terhitung)
+- `netlauncher list --json` → JSON valid 51 entri (overlay-aware)
+- Eksekusi `netlauncher tool ping 127.0.0.1` → exit 0, parser ping menampilkan packet loss & RTT
+- `netlauncher flow run healthcheck-harian` → 5/5 langkah exit 0, log flow dibuat
+- `netlauncher --dry-run flow run audit-web-lengkap --var URL=https://example.com` → `DOMAIN` terderivasi otomatis
+- `make ui-test` & tmux capture → menu utama, knowledge, workspace, flow, kategori, `Ctrl-E`, `Ctrl-T` tampil normal (11 asersi)
 - `NETLAUNCHER_CONFIG_DIR` / `NETLAUNCHER_DATA_DIR` + `--dry-run` → terisolasi tanpa menyentuh data pengguna
 - Symlink live (`~/.local/bin/netlauncher`, `~/.config/netlauncher`, `~/NETLAUNCHER_MEMORY.md`) → resolve ke repo
 - `desktop-file-validate` → valid

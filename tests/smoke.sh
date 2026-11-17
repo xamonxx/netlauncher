@@ -7,6 +7,9 @@ BIN="$REPO/bin/netlauncher"
 CONFIG="$REPO/config"
 TOOLS="$CONFIG/tools.tsv"
 SNIPPETS="$CONFIG/snippets.tsv"
+FLAGS="$CONFIG/flags.tsv"
+GUIDES="$CONFIG/guides"
+FLOWS="$CONFIG/flows"
 pass=0
 fail=0
 skipped=0
@@ -31,12 +34,16 @@ for f in "$BIN" "$REPO"/lib/*.sh "$CONFIG"/automations/*.sh "$REPO"/scripts/*.sh
 done
 [ -x "$BIN" ] && ok "script executable" || bad "script tidak executable"
 
-for f in "$TOOLS" "$SNIPPETS" "$CONFIG/help.md" "$REPO/MEMORY.md" "$REPO/AGENTS.md"; do
+for f in "$TOOLS" "$SNIPPETS" "$FLAGS" "$CONFIG/help.md" "$REPO/MEMORY.md" "$REPO/AGENTS.md"; do
   [ -s "$f" ] && ok "file: ${f#$REPO/}" || bad "file hilang/kosong: ${f#$REPO/}"
 done
 
-for m in core.sh ui.sh smart.sh snippets.sh wordlists.sh recipes.sh menu.sh doctor.sh; do
+for m in core.sh ui.sh runner.sh smart.sh snippets.sh wordlists.sh knowledge.sh flow.sh recipes.sh menu.sh doctor.sh; do
   [ -s "$REPO/lib/$m" ] && ok "modul: lib/$m" || bad "modul hilang: lib/$m"
+done
+
+for d in "$GUIDES" "$FLOWS" "$REPO/scripts/completions"; do
+  [ -d "$d" ] && ok "direktori: ${d#$REPO/}" || bad "direktori hilang: ${d#$REPO/}"
 done
 
 # Registry tools.tsv
@@ -59,6 +66,19 @@ scount="$(awk -F'\t' '!/^#/ && NF>0 {n++} END{print n+0}' "$SNIPPETS")"
 sbad="$(awk -F'\t' '!/^#/ && NF!=6 {print NR}' "$SNIPPETS")"
 [ -z "$sbad" ] && ok "semua baris snippets.tsv 6 field" || bad "snippets field salah: $sbad"
 
+# Flags, guides & flows
+fcount="$(awk -F'\t' '!/^#/ && NF>=7 {n++} END{print n+0}' "$FLAGS")"
+[ "$fcount" -ge 200 ] && ok "flags.tsv: $fcount flag" || bad "flags.tsv hanya $fcount flag"
+fbad="$(awk -F'\t' '!/^#/ && NF!=7 {print NR}' "$FLAGS")"
+[ -z "$fbad" ] && ok "semua baris flags.tsv 7 field" || bad "flags field salah: $fbad"
+gcount="$(find "$GUIDES" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+[ "$gcount" -ge 25 ] && ok "panduan resmi: $gcount file" || bad "panduan hanya $gcount file"
+flcount="$(find "$FLOWS" -maxdepth 1 -type f -name '*.flow' 2>/dev/null | wc -l | tr -d ' ')"
+[ "$flcount" -ge 6 ] && ok "automation flow: $flcount file" || bad "flow hanya $flcount file"
+for ff in "$FLOWS"/*.flow; do
+  grep -q '^\[flow\]' "$ff" && grep -q '^cmd[[:space:]]*=' "$ff" && ok "flow valid: $(basename "$ff")" || bad "flow tidak valid: $(basename "$ff")"
+done
+
 # Lint & Selftest
 out="$("$BIN" lint 2>&1)"
 contains "lint" "Lint lolos tanpa error" "$out"
@@ -68,12 +88,16 @@ contains "selftest" "Selftest selesai tanpa error" "$out"
 
 # CLI
 out="$("$BIN" --version 2>&1)"
-contains "--version" "netlauncher 2.0.0" "$out"
+contains "--version" "netlauncher 2.1.0" "$out"
 out="$("$BIN" --help 2>&1)"
 contains "--help memuat tool" "tool <id>" "$out"
 contains "--help memuat recipe" "recipe <nama>" "$out"
 contains "--help memuat examples" "examples [tool_id]" "$out"
 contains "--help memuat lint" "lint" "$out"
+contains "--help memuat guide" "guide [tool_id]" "$out"
+contains "--help memuat flags" "flags [tool_id]" "$out"
+contains "--help memuat flow" "flow <sub>" "$out"
+contains "--help memuat workspace" "workspace <sub>" "$out"
 
 out="$("$BIN" list --json 2>&1)"
 if python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert len(d)==51' <<< "$out" 2>/dev/null; then
@@ -122,6 +146,49 @@ out="$("$BIN" --preview-history __LOGS__ 2>&1)"
 contains "preview history __LOGS__" "Log Sesi Viewer" "$out"
 out="$("$BIN" --preview-automation "$CONFIG/automations/healthcheck-harian.sh" 2>&1)"
 contains "preview automation" "Healthcheck Jaringan Harian" "$out"
+out="$("$BIN" --preview-guide nmap 2>&1)"
+contains "preview guide nmap" "Panduan Resmi" "$out"
+contains "preview guide nmap" "Referensi Flag Resmi" "$out"
+out="$("$BIN" --preview-flag curl --max-time 2>&1)"
+contains "preview flag curl" "--max-time" "$out"
+contains "preview flag risk" "AMAN" "$out"
+out="$("$BIN" --preview-flow audit-web-lengkap 2>&1)"
+contains "preview flow" "Audit Web & TLS Lengkap" "$out"
+contains "preview flow langkah" "Alur Langkah" "$out"
+
+# CLI knowledge/flow/workspace
+out="$("$BIN" flow list 2>&1)"
+contains "flow list" "healthcheck-harian" "$out"
+out="$("$BIN" flow show inventaris-port-lokal 2>&1)"
+contains "flow show" "Inventaris Port" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$(mktemp -d)" "$BIN" workspace show 2>&1)"
+contains "workspace show" "workspace kosong" "$out"
+tmp_ws="$(mktemp -d)"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace set DOMAIN=example.com SUBNET=192.168.1.0/24 2>&1)"
+contains "workspace set" "Workspace disimpan" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace show 2>&1)"
+contains "workspace show tersimpan" "example.com" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace clear 2>&1)"
+contains "workspace clear" "dikosongkan" "$out"
+rm -rf "$tmp_ws"
+
+# Runner modern (non-TTY: tee + exit code)
+out="$("$BIN" tool ping 127.0.0.1 2>&1)"
+contains "runner eksekusi ping" " BERHASIL" "$out"
+contains "runner parser ping" "packet loss" "$out"
+contains "runner summary" "Ringkasan Eksekusi" "$out"
+
+# Overlay: tools/snippets/flags/flow lokal di config
+tmp_ov_cfg="$(mktemp -d)"
+cp "$TOOLS" "$SNIPPETS" "$FLAGS" "$CONFIG/help.md" "$tmp_ov_cfg/"
+cp -r "$GUIDES" "$FLOWS" "$tmp_ov_cfg/"
+printf 'diagnostik|smoke-tool|Smoke Tool|true|true|Tool uji overlay|true -h|0||term|true\n' > "$tmp_ov_cfg/tools.local.tsv"
+printf 'smoke-tool\tContoh overlay\ttrue\tContoh snippet overlay\t0\t\n' > "$tmp_ov_cfg/snippets.local.tsv"
+out="$(NETLAUNCHER_CONFIG_DIR="$tmp_ov_cfg" NETLAUNCHER_DATA_DIR="$(mktemp -d)" "$BIN" list 2>&1)"
+contains "overlay tools.local.tsv" "Smoke Tool" "$out"
+out="$(NETLAUNCHER_CONFIG_DIR="$tmp_ov_cfg" NETLAUNCHER_DATA_DIR="$(mktemp -d)" "$BIN" --preview-global snip:local:1 2>&1)"
+contains "overlay snippets.local.tsv" "Contoh overlay" "$out"
+rm -rf "$tmp_ov_cfg"
 
 # Wordlist index
 if [ -s "$CONFIG/wordlists.tsv" ]; then

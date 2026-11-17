@@ -228,6 +228,12 @@ ui_splash() {
 }
 
 ui_fzf() {
+  local ws_lbl="" border
+  if declare -F workspace_active_label >/dev/null 2>&1; then
+    ws_lbl="$(workspace_active_label 2>/dev/null || true)"
+    [ -n "$ws_lbl" ] && ws_lbl=" · ◎ ${ws_lbl:0:42}"
+  fi
+  border=" ◈ NETLAUNCHER v$VERSION · ${THEME^^} ◈$ws_lbl "
   "$FZF_BIN" \
     --ansi \
     --style=full:rounded \
@@ -239,7 +245,7 @@ ui_fzf() {
     --marker='✓' \
     --scrollbar='┃' \
     --highlight-line \
-    --border-label=" ◈ NETLAUNCHER v$VERSION · ${THEME^^} ◈ " \
+    --border-label="$border" \
     --border-label-pos=3 \
     --color="$FZF_COLORS" \
     "$@"

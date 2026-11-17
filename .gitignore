@@ -3,6 +3,14 @@ config/favorites.tsv
 config/wordlists.tsv
 config/theme.env
 
+# Overlay lokal (per-mesin, tidak di-track)
+config/tools.local.tsv
+config/snippets.local.tsv
+config/flows.local/
+
+# Workspace & state runtime lain
+*.env.local
+
 # Log dan arsip
 *.log
 *.tar.gz

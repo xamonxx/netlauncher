@@ -1,0 +1,44 @@
+[flow]
+id = diagnostik-wifi-link
+name = Diagnostik Interface & Link WiFi
+category = interface
+risk = pasif
+requires_auth = false
+sudo = false
+description = Periksa status adapter jaringan, link WiFi aktif (SSID, sinyal, bitrate), statistik RX/TX, dan driver NIC.
+tools = ip,iw,nmcli,ethtool
+
+[inputs]
+IFACE = Interface jaringan yang diperiksa (mis. wlan0 atau eth0)
+
+[step:1]
+title = Status Interface & Statistik Paket
+tool = ip-addr
+when = have:ip
+parser = net
+on_error = continue
+cmd = ip -brief addr && echo "---" && ip -s link show dev {IFACE}
+
+[step:2]
+title = Status Link Wireless (iw dev)
+tool = iw-dev
+when = have:iw
+parser = net
+on_error = continue
+cmd = iw dev && echo "---" && iw dev {IFACE} link
+
+[step:3]
+title = Status NetworkManager (nmcli)
+tool = nmcli
+when = have:nmcli
+parser = net
+on_error = continue
+cmd = nmcli device status
+
+[step:4]
+title = Info Driver & Link NIC (ethtool)
+tool = ethtool
+when = have:ethtool
+parser = net
+on_error = continue
+cmd = ethtool -i {IFACE} 2>/dev/null || ethtool {IFACE}

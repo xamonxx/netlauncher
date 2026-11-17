@@ -2,6 +2,45 @@
 
 Format mengikuti Keep a Changelog; versi mengikuti SemVer selama memungkinkan.
 
+## [2.1.0] - 2026-11-17
+
+### Added
+
+- `lib/runner.sh`: Modern Execution Runner dengan PTY (`script -qefc` pada TTY),
+  `PIPESTATUS[0]` pada non-TTY, log teks polos, parser output tool-aware,
+  saran langkah berikutnya, post-run menu (fzf filter, `less -R`, ringkasan,
+  salin, ekspor Markdown, rerun). `execute_command()` kini wrapper ke `runner_exec()`.
+- `lib/knowledge.sh` + `config/flags.tsv` (205 flag) + `config/guides/` (27 panduan
+  Bahasa Indonesia): Knowledge Base resmi, pratinjau flag, Interactive Flag Builder
+  (`fzf --multi` / `Tab`) dengan normalisasi subcommand wajib, dan live extractor
+  `--help`/`man` (menggunakan `man` untuk `amass`).
+- `lib/flow.sh` + `config/flows/` (6 starter `.flow`): engine otomasi deklaratif
+  dengan `[flow]`/`[inputs]`/`[step:N]`, `when` (`have:`, `var:`, `prev_ok`,
+  `confirm:`, digabung `;`), `capture`, `on_error`, `parser`, `timeout`, wizard,
+  browser UI, CLI `flow ui|list|show|run`, dashboard hasil, dan ekspor Markdown.
+- Target Workspace (`Ctrl-W` / `netlauncher workspace show|set|clear`) di
+  `~/.local/share/netlauncher/workspace.env`; diprioritaskan di Smart Picker,
+  Flag Builder, dan advisor. Border fzf kini menampilkan workspace aktif.
+- Overlay lokal: `tools.local.tsv`, `snippets.local.tsv`, `flows.local/` (di-`.gitignore`);
+  snippet memakai referensi `main:N` / `local:N`.
+- Prefix CLI/preview baru: `guide`, `flags`, `flow`, `workspace`,
+  `--preview-guide`, `--preview-flag`, `--preview-flow`; Completion Bash & Zsh.
+- `recipe_laporan()` dengan 3 template (ringkas, lengkap, audit) dan `logs_menu()`
+  yang menampilkan log tool/flow/resep serta laporan.
+
+### Changed
+
+- `lint` kini memvalidasi `flags.tsv`, `config/guides/`, dan `config/flows/*.flow`
+  selain `tools.tsv`, `snippets.tsv`, dan syntax. `doctor` melaporkan flag/guide/flow.
+- Semua eksekusi tool/snippet/builder lewat runner modern dengan konfirmasi
+  `confirm_authorized_action()` terpusat.
+- `smoke.sh` diperluas menjadi 107 asersi (runner, knowledge, flow, workspace,
+  overlay, preview baru); `make ui-test` menjadi 11 asersi (knowledge, workspace, flow).
+- Perbaikan kompatibilitas Kali: `httpx-toolkit` (bukan `httpx` python),
+  `traceroute --help`, `nikto -H`, `man airmon-ng`, penanganan `nc.traditional v1.10`.
+- Dokumentasi (`README.md`, `config/help.md`, `AGENTS.md`, `MEMORY.md`, `docs/*`)
+  diperbarui untuk v2.1.0.
+
 ## [2.0.0] - 2026-11-17
 
 ### Added

@@ -1,0 +1,46 @@
+[flow]
+id = audit-dns-mendalam
+name = Audit DNS, Email Auth & WHOIS
+category = dns
+risk = pasif
+requires_auth = false
+sudo = false
+description = Query record A, AAAA, MX, NS, TXT, SOA, SPF/DMARC, DNSSEC, reverse PTR, dan ringkasan WHOIS domain.
+tools = dig,whois
+
+[inputs]
+DOMAIN = Domain target untuk audit DNS (mis. example.com)
+
+[step:1]
+title = Record DNS Utama (A, AAAA, MX, NS, TXT, SOA)
+tool = dig
+when = have:dig
+parser = dns
+capture = PRIMARY_IP=awk '$4=="A"{print $5; exit}'
+on_error = continue
+cmd = dig +noall +answer {DOMAIN} A {DOMAIN} AAAA {DOMAIN} MX {DOMAIN} NS {DOMAIN} TXT {DOMAIN} SOA
+
+[step:2]
+title = Audit SPF & DMARC
+tool = dig
+when = have:dig
+parser = dns
+on_error = continue
+cmd = dig +short TXT {DOMAIN} && echo "--- DMARC ---" && dig +short TXT _dmarc.{DOMAIN}
+
+[step:3]
+title = Reverse PTR & DNSSEC
+tool = dig
+when = have:dig;var:PRIMARY_IP
+parser = dns
+on_error = continue
+cmd = dig -x {PRIMARY_IP} +short && dig +dnssec +short {DOMAIN}
+
+[step:4]
+title = Ringkasan WHOIS Domain
+tool = whois
+when = have:whois
+parser = generic
+timeout = 12
+on_error = continue
+cmd = whois -H {DOMAIN} | grep -iE 'domain name|registrar|creation|expir|name server|status' | head -n 25

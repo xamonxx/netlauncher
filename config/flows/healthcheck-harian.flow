@@ -1,0 +1,51 @@
+[flow]
+id = healthcheck-harian
+name = Healthcheck Jaringan Harian
+category = diagnostik
+risk = aman
+requires_auth = false
+sudo = false
+description = Cek status interface, ping gateway, ping internet (1.1.1.1), resolusi DNS, dan latensi HTTP/TLS.
+tools = ip,ping,dig,curl
+
+[inputs]
+
+[step:1]
+title = Status Interface & Tabel Rute
+tool = ip-addr
+when = have:ip
+parser = net
+on_error = continue
+cmd = ip -brief addr && echo "---" && ip route
+
+[step:2]
+title = Ping Default Gateway
+tool = ping
+when = have:ping;var:NET_GW
+parser = ping
+on_error = continue
+cmd = ping -c 4 {NET_GW}
+
+[step:3]
+title = Ping Internet (1.1.1.1)
+tool = ping
+when = have:ping
+parser = ping
+on_error = continue
+cmd = ping -c 4 1.1.1.1
+
+[step:4]
+title = Uji Resolusi DNS (example.com)
+tool = dig
+when = have:dig
+parser = dns
+on_error = continue
+cmd = dig +short A example.com
+
+[step:5]
+title = Uji HTTP & Timing TLS
+tool = curl
+when = have:curl
+parser = http_headers
+on_error = continue
+cmd = curl -ILsS --max-time 8 https://example.com && curl -o /dev/null -sS --max-time 8 -w "Timing: DNS=%{time_namelookup}s Connect=%{time_connect}s TLS=%{time_appconnect}s Total=%{time_total}s\n" https://example.com

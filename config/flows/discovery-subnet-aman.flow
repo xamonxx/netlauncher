@@ -1,0 +1,36 @@
+[flow]
+id = discovery-subnet-aman
+name = Discovery Subnet Lokal (Berizin)
+category = scan
+risk = aktif
+requires_auth = true
+sudo = false
+description = Tampilkan tabel ARP/NDP lokal, rute subnet, dan opsional ping sweep Nmap dengan konfirmasi otorisasi.
+tools = ip,nmap
+
+[inputs]
+SUBNET = Subnet CIDR lokal berizin (mis. 192.168.1.0/24)
+
+[step:1]
+title = Tabel Tetangga ARP/NDP Lokal
+tool = ip-addr
+when = have:ip
+parser = net
+on_error = continue
+cmd = ip neigh show
+
+[step:2]
+title = Rute Subnet Aktif
+tool = ip-route
+when = have:ip
+parser = net
+on_error = continue
+cmd = ip route show
+
+[step:3]
+title = Ping Sweep Subnet (Nmap -sn)
+tool = nmap
+when = have:nmap;confirm:Jalankan ping sweep nmap -sn pada subnet ini?
+parser = nmap
+on_error = continue
+cmd = nmap -sn {SUBNET}

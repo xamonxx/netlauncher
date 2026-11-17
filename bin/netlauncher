@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # netlauncher - Smart terminal launcher & automation untuk tool jaringan (authorized use only)
-# Version: 2.0.0
+# Version: 2.1.0
 set -uo pipefail
 umask 077
 export PATH="$HOME/.local/bin:$PATH"
@@ -13,12 +13,18 @@ LIB_DIR="$REPO_DIR/lib"
 source "$LIB_DIR/core.sh"
 # shellcheck source=../lib/ui.sh
 source "$LIB_DIR/ui.sh"
+# shellcheck source=../lib/runner.sh
+source "$LIB_DIR/runner.sh"
 # shellcheck source=../lib/smart.sh
 source "$LIB_DIR/smart.sh"
 # shellcheck source=../lib/snippets.sh
 source "$LIB_DIR/snippets.sh"
 # shellcheck source=../lib/wordlists.sh
 source "$LIB_DIR/wordlists.sh"
+# shellcheck source=../lib/knowledge.sh
+source "$LIB_DIR/knowledge.sh"
+# shellcheck source=../lib/flow.sh
+source "$LIB_DIR/flow.sh"
 # shellcheck source=../lib/recipes.sh
 source "$LIB_DIR/recipes.sh"
 # shellcheck source=../lib/menu.sh
@@ -37,6 +43,9 @@ main_menu_loop() {
       quit|"") exit 0 ;;
       search) global_search_menu ;;
       snippets) snippets_menu ;;
+      knowledge) knowledge_menu ;;
+      workspace) workspace_menu ;;
+      flow) flow_ui ;;
       automation) automation_menu ;;
       favorit) favorites_menu ;;
       riwayat) history_menu ;;
@@ -71,6 +80,7 @@ main() {
 
   ensure_dirs
   load_theme
+  load_workspace
 
   case "${1:-}" in
     "")
@@ -84,6 +94,35 @@ main() {
     examples|snippets)
       require_fzf
       snippets_menu "${2:-}"
+      ;;
+    guide)
+      if [ -n "${2:-}" ]; then
+        if [ -t 0 ] && [ -t 1 ]; then
+          require_fzf
+          knowledge_menu "$2"
+        else
+          knowledge_render_guide "$2"
+        fi
+      else
+        require_fzf
+        knowledge_menu
+      fi
+      ;;
+    flags)
+      require_fzf
+      if [ -n "${2:-}" ]; then
+        knowledge_flag_builder "$2"
+      else
+        knowledge_menu
+      fi
+      ;;
+    flow)
+      shift
+      flow_cli "$@"
+      ;;
+    workspace)
+      shift
+      workspace_cli "$@"
       ;;
     automation)
       require_fzf
@@ -121,8 +160,8 @@ main() {
     update) do_update ;;
     tool)
       shift
-      [ -n "${1:-}" ] || { err "Gunakan: netlauncher tool <id>"; exit 1; }
-      run_tool "$1"
+      [ -n "${1:-}" ] || { err "Gunakan: netlauncher tool <id> [argumen]"; exit 1; }
+      run_tool "$@"
       ;;
     recipe)
       shift
@@ -135,6 +174,9 @@ main() {
     --preview-recipe) preview_recipe "${2:-}" ;;
     --preview-snippet) preview_snippet "${2:-}" ;;
     --preview-automation) preview_automation "${2:-}" ;;
+    --preview-guide) preview_guide "${2:-}" ;;
+    --preview-flag) preview_flag "${2:-}" "${3:-}" ;;
+    --preview-flow) preview_flow "${2:-}" ;;
     --preview-log) preview_log "${2:-}" ;;
     --preview-theme) preview_theme "${2:-}" ;;
     --preview-global) preview_global "${2:-}" ;;

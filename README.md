@@ -1,42 +1,48 @@
 # NetLauncher
 
 Smart Network & Security Command Center berbasis terminal (`Bash + fzf 0.75`)
-untuk Kali Linux. UI modern berbahasa Indonesia dengan tema truecolor, animasi
-terminal, deteksi konteks jaringan otomatis, 104 contoh perintah siap pakai,
-Command Builder, Custom Automation Scripts, dan 10 resep otomasi aman.
+untuk Kali Linux. UI modern berbahasa Indonesia dengan tema truecolor, animasi,
+deteksi konteks jaringan otomatis, 104 contoh perintah, Knowledge Base resmi +
+Interactive Flag Builder, Automation Flow (`.flow`), Target Workspace, Modern
+Execution Runner, dan 10 resep otomasi aman.
 
 > **Authorized use only.** Gunakan hanya pada aset/jaringan milik sendiri atau
 > yang ada izin tertulis. Launcher ini membuka tool yang sudah terpasang dan tidak
 > menyediakan otomasi serangan (deauth, handshake capture, brute-force).
 
-## Fitur Utama (v2.0.0)
+## Fitur Utama (v2.1.0)
 
-- **UI Terminal Modern & Animasi**: `fzf 0.75` `--style=full:rounded` dengan
-  outer frame, panel status sistem real-time, inspector preview, splash screen
-  ASCII, progress bar, dan spinner murni Bash (`--no-anim` untuk menonaktifkan).
-- **4 Tema Truecolor**: `cyber` (default), `tokyo`, `emerald`, dan `amber`
-  dengan pratinjau palet langsung (`Ctrl-T` atau `netlauncher theme`).
-- **51 Tool dalam 7 Kategori**: Diagnostik Jaringan (8), DNS & Web (14),
-  Interface & Routing (8), Pemindaian & Monitoring (9), Wireless Berizin (5),
-  Tool Keamanan Berizin (4), dan Hackingtool (3).
-- **Pencarian Global (`Ctrl-S`)**: cari lintas 51 tool dan 104 contoh perintah
-  sekaligus dalam satu layar.
-- **104 Contoh Perintah & Code Snippets (`Ctrl-E`)**: lengkap dengan penjelasan,
-  cuplikan Bash, Smart Fill parameter, edit sebelum jalan, salin clipboard,
-  `--dry-run`, dan simpan ke Custom Automation.
-- **Smart Context & Command Builder**: deteksi otomatis interface aktif, IP/CIDR,
-  subnet, gateway, DNS, dan SSID WiFi; saran target/interface/domain/wordlist
-  kontekstual; serta Missing Tool Advisor.
-- **Custom Automation Scripts**: kelola, buat, edit, dan jalankan script Bash
-  otomasi di `config/automations/` (termasuk 4 starter script siap pakai).
-- **10 Resep Otomasi Aman**: `cek-koneksi`, `info-jaringan`, `audit-web`, `dns`,
-  `monitor-port`, `discovery-lokal`, `scan-target`, `capture`, `wordlist-stats`,
-  dan `laporan` (semua mendukung `--dry-run`).
-- **Wordlist Browser (136 entri)**: `rockyou.txt`, SecLists, dan 4 koleksi
-  wordlist Indonesia (`geovedi`, `KBBI v6.1.0`, `REI`, `SecLists ID`).
-- **Riwayat, Log Viewer (`Ctrl-L`), & CLI Lengkap**: `lint`, `selftest`,
-  `doctor`, `list --json`, `update`, rotasi log > 30 hari, desktop entry, dan
-  alias `net`.
+- **UI Terminal Modern & Animasi**: `fzf 0.75` `--style=full:rounded`, outer frame,
+  panel status sistem real-time (termasuk workspace aktif), inspector preview,
+  splash ASCII, progress bar, dan spinner murni Bash (`--no-anim`).
+- **4 Tema Truecolor**: `cyber`, `tokyo`, `emerald`, `amber` dengan pratinjau
+  palet (`Ctrl-T` / `netlauncher theme`).
+- **51 Tool dalam 7 Kategori**: Diagnostik (8), DNS & Web (14), Interface &
+  Routing (8), Pemindaian & Monitoring (9), Wireless berizin (5), Keamanan
+  berizin (4), Hackingtool (3).
+- **Pencarian Global (`Ctrl-S`)**: cari lintas tool, snippet, dan flow.
+- **104 Contoh Perintah (`Ctrl-E`)**: Smart Fill, edit, salin, dry-run, simpan
+  ke automation.
+- **Knowledge Base Resmi (`Ctrl-K`)**: 27 panduan Bahasa Indonesia, 205 flag
+  terkurasi untuk 51 tool, dan ekstrak flag langsung dari `--help`/`man` lokal.
+- **Interactive Flag Builder** (`netlauncher flags <id>`): pilih banyak flag
+  dengan `Tab`, isi argumen, normalisasi subcommand wajib, lalu
+  jalankan/salin/dry-run/simpan.
+- **Modern Execution Runner**: PTY (`script -qefc`) menjaga warna & prompt
+  interaktif, `PIPESTATUS[0]` menjaga exit code di non-TTY, log tetap teks
+  polos. Ringkasan temuan tool-aware, filter output, saran langkah berikutnya,
+  ekspor Markdown, dan jalankan ulang.
+- **Automation Flow**: 6 starter `.flow` deklaratif dengan variabel, kondisi
+  (`have:`, `var:`, `prev_ok`, `confirm:`), capture, parser, timeout, `on_error`,
+  dashboard hasil, dan ekspor laporan.
+- **Target Workspace** (`Ctrl-W`): `TARGET`, `DOMAIN`, `URL`, `SUBNET`, `IFACE`
+  aktif dipakai otomatis oleh smart picker, builder, dan flow.
+- **Overlay Lokal**: `tools.local.tsv`, `snippets.local.tsv`, `flows.local/`
+  (tidak di-track).
+- **Custom Automation & 10 Resep Aman**: semua mendukung `--dry-run` dan
+  konfirmasi sebelum aksi berdampak.
+- **Wordlist Browser (136 entri)**, Riwayat, Log Viewer (`Ctrl-L`),
+  `lint`, `selftest`, `doctor`, `list --json`, Bash/Zsh completion.
 
 ## Instalasi di mesin ini
 
@@ -48,16 +54,10 @@ Sumber kanonik ada di repo ini; lokasi live sudah berupa symlink:
 ~/NETLAUNCHER_MEMORY.md    -> ~/tools/netlauncher/MEMORY.md
 ```
 
-Pasang ulang symlink (idempoten):
+Pasang ulang symlink (idempoten): `make install` atau `./scripts/install.sh`.
 
-```bash
-make install
-# atau
-./scripts/install.sh
-```
-
-Prasyarat: `fzf` (disarankan 0.60+, terpasang `0.75`), `bash` 4+, dan tool yang
-ingin dipakai. Verifikasi dengan:
+Prasyarat: `bash` 4+, `fzf` 0.60+ (terpasang `0.75`), `jq`, `script` (util-linux),
+`python3`, `tmux` (opsional). Verifikasi:
 
 ```bash
 netlauncher doctor
@@ -68,51 +68,47 @@ netlauncher selftest
 ## Penggunaan
 
 ```bash
-net                               # alias untuk netlauncher
-netlauncher                       # menu utama interaktif
-netlauncher search                # pencarian global tool & contoh perintah
-netlauncher examples [tool_id]    # browser contoh perintah & code snippets
-netlauncher automation            # kelola & jalankan custom automation scripts
-netlauncher wordlists [refresh]   # browser / refresh index wordlist
-netlauncher logs                  # buka viewer log sesi
-netlauncher theme [nama]          # ubah tema (cyber|tokyo|emerald|amber)
-netlauncher tool <id>             # jalankan tool langsung
-netlauncher recipe <nama>         # jalankan resep otomasi aman
-netlauncher list [--json]         # daftar semua tool (tabel atau JSON)
-netlauncher doctor                # cek dependensi & terminal
-netlauncher selftest              # validasi registry & snippet
-netlauncher lint                  # validasi ketat format TSV & syntax
-netlauncher update                # update hackingtool + index wordlist
-netlauncher help                  # panduan lengkap
-netlauncher --version
+net                                  # alias
+netlauncher                          # menu utama interaktif
+netlauncher search                   # pencarian global
+netlauncher examples [tool_id]       # browser contoh perintah
+netlauncher guide [tool_id]          # panduan resmi tool
+netlauncher flags [tool_id]          # Interactive Flag Builder
+netlauncher flow [ui|list|show|run]  # Automation Flow
+netlauncher workspace [show|set|clear]
+netlauncher automation               # custom automation scripts
+netlauncher wordlists [refresh]
+netlauncher logs                     # log sesi & laporan
+netlauncher theme [nama]
+netlauncher tool <id> [argumen]
+netlauncher recipe <nama>
+netlauncher list [--json]
+netlauncher doctor | selftest | lint | update | help
+netlauncher --version | --help
 ```
 
 Opsi global: `--no-anim`, `--dry-run`, `--theme <nama>`.
 
-Shortcut di menu utama:
+Shortcut menu utama: `Enter` buka, `Esc` kembali, `Ctrl-/` preview,
+`Ctrl-S` cari, `Ctrl-E` contoh, `Ctrl-K` knowledge, `Ctrl-W` workspace,
+`Ctrl-T` tema, `Ctrl-L` riwayat/log.
 
-- `Enter` membuka, `Esc` kembali, `Ctrl-/` toggle preview
-- `Ctrl-S` pencarian global, `Ctrl-E` contoh perintah, `Ctrl-T` tema & animasi, `Ctrl-L` riwayat & log
+Contoh flow:
 
-Resep yang tersedia:
-
-```text
-cek-koneksi, info-jaringan, audit-web, dns, monitor-port,
-discovery-lokal, scan-target, capture, wordlist-stats, laporan
+```bash
+netlauncher flow list
+netlauncher flow show audit-web-lengkap
+netlauncher --dry-run flow run audit-web-lengkap --var URL=https://example.com
+netlauncher flow run healthcheck-harian
+netlauncher workspace set DOMAIN=example.com SUBNET=192.168.1.0/24
 ```
 
-## Wordlist
+Completion:
 
-Wordlist Indonesia dan umum sudah diindeks (136 entri):
-
-- `~/wordlists/rockyou.txt`
-- `~/wordlists/indonesian/geovedi/*.lst` — public domain
-- `~/wordlists/indonesian/kbbi/all_entries_v6.1.0.txt`
-- `~/wordlists/indonesian/elliottophellia/rei-indonesia-wordlist.txt` — CC BY-SA 4.0
-- `~/wordlists/indonesian/indonesian-pwdb-top150.txt` — SecLists
-- SecLists, dirb, dirbuster, john, nmap, sqlmap, wfuzz, metasploit, fern-wifi
-
-Detail sumber, lisensi, dan SHA256: `~/wordlists/README.md`.
+```bash
+source scripts/completions/netlauncher.bash      # Bash
+# atau salin scripts/completions/_netlauncher ke fpath Zsh
+```
 
 ## Pengembangan
 
@@ -122,35 +118,34 @@ make check        # syntax + smoke test
 make lint         # netlauncher lint + shellcheck (jika ada)
 make test         # sama dengan check
 make ui-test      # uji UI di tmux
-make backup       # arsip konfigurasi + script
+make backup
 ```
 
-Baca:
-
-- `AGENTS.md` — aturan kontribusi dan checklist definition of done
-- `MEMORY.md` — konteks proyek, arsitektur, wordlist, troubleshooting
-- `docs/ARCHITECTURE.md` — detail internal
-- `docs/DEVELOPMENT.md` — alur kerja pengembangan
-- `docs/ROADMAP.md` — rencana pengembangan
-- `docs/CHANGELOG.md` — riwayat perubahan
+Baca `AGENTS.md`, `MEMORY.md`, dan `docs/`.
 
 ## Struktur
 
 ```text
 bin/netlauncher       entrypoint CLI & loop menu utama
-lib/*.sh              8 modul (core, ui, smart, snippets, wordlists, recipes, menu, doctor)
+lib/*.sh              11 modul (core, ui, runner, smart, snippets,
+                      wordlists, knowledge, flow, recipes, menu, doctor)
 config/tools.tsv      registry 51 tool (11 field)
-config/snippets.tsv   104 contoh perintah & code snippets (6 field tab-delimited)
+config/snippets.tsv   104 contoh perintah (6 field tab)
+config/flags.tsv      205 flag resmi (7 field tab)
+config/guides/        27 panduan resmi Bahasa Indonesia
+config/flows/         6 starter automation flow (.flow)
 config/automations/   starter & custom automation scripts (*.sh)
 config/help.md        panduan di dalam TUI
-config/               runtime favorites/wordlists/theme.env (tidak di-track)
-docs/                 dokumentasi teknis
+scripts/completions/  Bash & Zsh completion
 tests/smoke.sh        uji non-interaktif
-scripts/              install, backup, dan ui-test
+scripts/              install, backup, ui-test
 ```
+
+Runtime: `~/.local/share/netlauncher/` (logs, history, targets.history,
+workspace.env), `~/.local/share/netlauncher/logs/`, `~/laporan/`.
 
 ## Lisensi dan batasan
 
 Proyek internal, tanpa lisensi publik. Wordlist pihak ketiga mengikuti lisensi
-masing-masing. Jangan redistribusikan `rockyou.txt` atau wordlist tanpa memeriksa
-lisensinya.
+masing-masing. Jangan redistribusikan `rockyou.txt` atau wordlist tanpa
+memeriksa lisensinya. Tidak ada password, token, atau kredensial yang disimpan.

@@ -4,7 +4,7 @@ doctor() {
   local fails=0 c f
   ui_card_header "NetLauncher Doctor" "Pemeriksaan dependensi, tool, terminal, dan konfigurasi"
   echo
-  local cmds=(fzf git pipx python3 go ruby tmux hackingtool nmap ip ss dig curl openssl whois tcpdump tshark wireshark aircrack-ng airmon-ng)
+  local cmds=(fzf git pipx python3 go ruby tmux jq script stdbuf less hackingtool nmap ip ss dig curl openssl whois tcpdump tshark wireshark aircrack-ng airmon-ng)
   for c in "${cmds[@]}"; do
     if have "$c"; then ok "$c: $(command -v "$c")"; else err "$c: tidak ditemukan"; fails=$((fails+1)); fi
   done
@@ -13,12 +13,17 @@ doctor() {
     *":$HOME/.local/bin:"*) ok "PATH berisi ~/.local/bin" ;;
     *) err "PATH tidak berisi ~/.local/bin"; fails=$((fails+1)) ;;
   esac
-  for f in "$TOOLS_FILE" "$SNIPPETS_FILE" "$HELP_FILE" "$WORDLISTS_FILE"; do
+  for f in "$TOOLS_FILE" "$SNIPPETS_FILE" "$FLAGS_FILE" "$HELP_FILE" "$WORDLISTS_FILE"; do
     if [ -s "$f" ]; then ok "File: $f"; else err "File: $f (belum ada/kosong)"; fails=$((fails+1)); fi
   done
-  for f in "$HOME/wordlists" "$HOME/wordlists/indonesian" "$AUTOMATIONS_DIR"; do
+  for f in "$HOME/wordlists" "$HOME/wordlists/indonesian" "$AUTOMATIONS_DIR" "$FLOWS_DIR" "$GUIDES_DIR"; do
     if [ -d "$f" ]; then ok "Direktori: $f"; else err "Direktori: $f tidak ada"; fails=$((fails+1)); fi
   done
+  local fc gc
+  fc="$(awk -F'\t' '!/^#/ && NF>=7 {n++} END{print n+0}' "$FLAGS_FILE" 2>/dev/null || echo 0)"
+  gc="$(find "$GUIDES_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+  ok "Flag terkurasi: $fc entri │ Panduan: $gc file"
+  ok "Automation Flow: $(flow_list_files 2>/dev/null | wc -l | tr -d ' ') file"
   echo
   ok "Terminal: TERM=${TERM:-?} COLORTERM=${COLORTERM:-?} Tema=$THEME Animasi=$([ "${ANIM:-1}" = "1" ] && echo ON || echo OFF)"
   if have fzf; then ok "fzf versi: $(fzf --version 2>/dev/null | head -n1)"; fi
@@ -75,18 +80,28 @@ Commands:
   search              Pencarian global tool & contoh perintah
   examples [tool_id]  Browser contoh perintah & code snippets
   snippets [tool_id]  Alias untuk examples
+  guide [tool_id]     Panduan resmi tool (Bahasa Indonesia)
+  flags [tool_id]     Interactive Flag Builder dari referensi resmi
+  flow <sub>          Automation Flow: list | show <id> | run <id> [--var K=V]
+  workspace <sub>     Target Workspace: show | set K=V ... | clear
   automation          Kelola & jalankan custom automation scripts
   wordlists [refresh] Browser/index wordlist
-  logs                Buka viewer log sesi
+  logs                Buka viewer log sesi & laporan
   theme [nama]        Ubah tema warna & animasi
-  tool <id>           Jalankan tool berdasarkan id
+  tool <id>           Jalankan tool berdasarkan id (keluar modern + parser)
   recipe <nama>       Jalankan resep otomasi aman
   list [--json]       Daftar semua tool di registry
   doctor              Cek dependensi, terminal, dan tool
   selftest            Validasi registry, snippet, dan file
-  lint                Validasi ketat format tools.tsv & snippets.tsv
+  lint                Validasi tools.tsv, snippets.tsv, flags.tsv, & .flow
   update              Update hackingtool + index wordlist
   help                Panduan lengkap
+
+Preview (dipakai fzf):
+  --preview-tool, --preview-category, --preview-snippet, --preview-guide,
+  --preview-flag <tool> <flag>, --preview-flow, --preview-recipe,
+  --preview-automation, --preview-log, --preview-theme, --preview-global,
+  --preview-history, --preview-wordlist
 
 Resep:
   cek-koneksi, info-jaringan, audit-web, dns, monitor-port,
@@ -96,8 +111,12 @@ Contoh:
   netlauncher
   netlauncher search
   netlauncher examples nmap
+  netlauncher guide nmap
+  netlauncher flags curl
+  netlauncher flow list
+  netlauncher flow run audit-web-lengkap --var URL=https://example.com
+  netlauncher workspace set DOMAIN=example.com SUBNET=192.168.1.0/24
   netlauncher recipe audit-web
-  netlauncher list --json
   netlauncher --dry-run tool ping
 EOF
 }
@@ -185,6 +204,49 @@ lint() {
     ok "snippets.tsv diperiksa ($scount snippet)"
   fi
 
+  # Validasi flags.tsv (7 field tab-delimited, tool_id harus terdaftar)
+  if [ -f "$FLAGS_FILE" ]; then
+    ln=0
+    local flag_n=0 fid flt farg fcat frisk fdesc fex
+    while IFS= read -r line; do
+      ln=$((ln+1))
+      case "$line" in ''|'#'*) continue ;; esac
+      [ "$(awk -F'\t' '{print NF}' <<< "$line")" -eq 7 ] || {
+        err "flags.tsv:$ln jumlah field bukan 7"; fails=$((fails+1)); continue
+      }
+      # Tab adalah IFS-whitespace:Field kosong bisa bergeser saat dibaca read,
+      # jadi ambil kolom memakai awk yang menjaga field kosong.
+      fid="$(awk -F'\t' '{print $1}' <<< "$line")"
+      flt="$(awk -F'\t' '{print $2}' <<< "$line")"
+      frisk="$(awk -F'\t' '{print $5}' <<< "$line")"
+      if [ -z "${seen_ids[$fid]:-}" ]; then
+        err "flags.tsv:$ln tool_id tidak ada di tools.tsv: $fid"; fails=$((fails+1))
+      fi
+      [ -n "$flt" ] || { err "flags.tsv:$ln flag kosong"; fails=$((fails+1)); }
+      case "$frisk" in pasif|aman|aktif|sudo) ;; *) err "flags.tsv:$ln risk tidak dikenal: $frisk"; fails=$((fails+1)) ;; esac
+      flag_n=$((flag_n+1))
+    done < "$FLAGS_FILE"
+    ok "flags.tsv diperiksa ($flag_n flag)"
+  fi
+
+  # Validasi panduan & automation flow
+  local gd ff fstep nsteps
+  gd="$(find "$GUIDES_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
+  [ "$gd" -gt 0 ] && ok "Panduan resmi: $gd file" || { warn "Belum ada panduan resmi di $GUIDES_DIR"; }
+  while IFS= read -r ff; do
+    [ "$(grep -c '^\[flow\]' "$ff")" -eq 1 ] || { err "flow $(basename "$ff"): blok [flow] tidak tepat"; fails=$((fails+1)); }
+    [ "$(grep -c '^\[inputs\]' "$ff")" -eq 1 ] || { err "flow $(basename "$ff"): blok [inputs] tidak tepat"; fails=$((fails+1)); }
+    nsteps="$(grep -c '^\[step:' "$ff")"
+    [ "$nsteps" -gt 0 ] || { err "flow $(basename "$ff"): tidak punya langkah"; fails=$((fails+1)); }
+    while IFS= read -r fstep; do
+      grep -Eq "^${fstep}[[:space:]]*=[[:space:]]*[^[:space:]]" "$ff" || {
+        err "flow $(basename "$ff"): field '$fstep' kosong"; fails=$((fails+1))
+      }
+    done < <(printf 'id\nname\ndescription\n')
+    grep -q '^cmd[[:space:]]*=' "$ff" || { err "flow $(basename "$ff"): tidak ada cmd"; fails=$((fails+1)); }
+  done < <(flow_list_files)
+  ok "Automation flow divalidasi ($(flow_list_files 2>/dev/null | wc -l | tr -d ' ') file)"
+
   local f
   for f in "$REPO_DIR/bin/netlauncher" "$LIB_DIR"/*.sh; do
     [ -f "$f" ] || continue
@@ -200,39 +262,46 @@ lint() {
 }
 
 list_tools() {
-  local fmt="${1:-table}"
+  local fmt="${1:-table}" tf_args=() tf
+  while IFS= read -r tf; do tf_args+=("$tf"); done < <(tools_files)
   if [ "$fmt" = "--json" ]; then
-    python3 - "$TOOLS_FILE" <<'PY'
-import json, shutil, sys
+    python3 - "${tf_args[@]}" <<'PY'
+import json, os, shutil, sys
 items = []
-with open(sys.argv[1], encoding="utf-8") as f:
-    for line in f:
-        line = line.rstrip("\n")
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split("|")
-        if len(parts) != 11:
-            continue
-        cat, tid, label, binary, template, desc, help_cmd, sudo, arg_prompt, mode, examples = parts
-        items.append({
-            "category": cat,
-            "id": tid,
-            "label": label,
-            "binary": binary,
-            "installed": shutil.which(binary) is not None,
-            "template": template,
-            "description": desc,
-            "help": help_cmd,
-            "sudo": sudo == "1",
-            "arg_prompt": arg_prompt,
-            "mode": mode,
-            "examples": examples,
-        })
+paths = [p for p in sys.argv[1:] if p]
+for path in paths:
+    if not os.path.isfile(path):
+        continue
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) != 11:
+                continue
+            cat, tid, label, binary, template, desc, help_cmd, sudo, arg_prompt, mode, examples = parts
+            items.append({
+                "category": cat,
+                "id": tid,
+                "label": label,
+                "binary": binary,
+                "installed": shutil.which(binary) is not None,
+                "template": template,
+                "description": desc,
+                "help": help_cmd,
+                "sudo": sudo == "1",
+                "arg_prompt": arg_prompt,
+                "mode": mode,
+                "examples": examples,
+            })
 print(json.dumps(items, indent=2, ensure_ascii=False))
 PY
   else
     printf '%-12s %-20s %-22s %-10s %s\n' "KATEGORI" "ID" "LABEL" "STATUS" "DESKRIPSI"
-    awk -F'|' '!/^#/ && NF==11 {print $1 "|" $2 "|" $3 "|" $4 "|" $6}' "$TOOLS_FILE" |
+    while IFS= read -r tf; do
+      awk -F'|' '!/^#/ && NF==11 {print $1 "|" $2 "|" $3 "|" $4 "|" $6}' "$tf"
+    done < <(tools_files) |
     while IFS='|' read -r cat id label binary desc; do
       local st="belum"
       have "$binary" && st="terpasang"
