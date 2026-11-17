@@ -1,0 +1,953 @@
+#!/usr/bin/env bash
+# netlauncher - Launcher terminal modern untuk tool jaringan (authorized use only)
+# Version: 1.0.0
+set -uo pipefail
+umask 077
+export PATH="$HOME/.local/bin:$PATH"
+
+APP_NAME="netlauncher"
+VERSION="1.0.0"
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/netlauncher"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/netlauncher"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/netlauncher"
+TOOLS_FILE="$CONFIG_DIR/tools.tsv"
+WORDLISTS_FILE="$CONFIG_DIR/wordlists.tsv"
+HELP_FILE="$CONFIG_DIR/help.md"
+FAV_FILE="$CONFIG_DIR/favorites.tsv"
+LOG_DIR="$DATA_DIR/logs"
+HISTORY_FILE="$DATA_DIR/history.log"
+REPORT_DIR="$HOME/laporan"
+FZF_BIN="${FZF_BIN:-$(command -v fzf 2>/dev/null || true)}"
+FZF_COLORS='fg:#d0d0d0,bg:#101418,hl:#5f87af,fg+:#ffffff,bg+:#1c2430,hl+:#5fd7ff,info:#afaf87,prompt:#87d7ff,pointer:#ffd75f,marker:#87d75f,spinner:#ffd75f,header:#87afaf,border:#5f87af'
+
+if [ -t 1 ]; then
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
+  C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
+  C_BLUE=$'\033[34m'; C_MAGENTA=$'\033[35m'; C_CYAN=$'\033[36m'; C_WHITE=$'\033[97m'
+else
+  C_RESET=""; C_BOLD=""; C_DIM=""; C_RED=""; C_GREEN=""; C_YELLOW=""
+  C_BLUE=""; C_MAGENTA=""; C_CYAN=""; C_WHITE=""
+fi
+
+declare -A CAT_NAMES=(
+  [diagnostik]="Diagnostik Jaringan"
+  [dns]="DNS & Web"
+  [interface]="Interface & Routing"
+  [scan]="Pemindaian & Monitoring"
+  [wireless]="Wireless (Berizin)"
+  [security]="Tool Keamanan (Berizin)"
+  [hackingtool]="Hackingtool"
+)
+declare -A CAT_DESC=(
+  [diagnostik]="Ping, traceroute, curl, wget. Cek konektivitas dan HTTP."
+  [dns]="Query DNS, fingerprint web, dan tool pengujian web berizin."
+  [interface]="Alamat IP, routing, socket, dan antarmuka wireless."
+  [scan]="Nmap, tcpdump, dan Wireshark untuk pemindaian/monitoring."
+  [wireless]="Tool wireless yang sudah terpasang. Gunakan hanya pada jaringan berizin."
+  [security]="Hydra, John, Hashcat, Metasploit. Hanya untuk target berizin."
+  [hackingtool]="TUI hackingtool: 219 tool dalam 21 kategori."
+)
+
+say()  { printf '%s\n' "$*"; }
+ok()   { printf '%s✓%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
+warn() { printf '%s!%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; }
+err()  { printf '%s✗%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; }
+die()  { err "$*"; exit 1; }
+have() { command -v "$1" >/dev/null 2>&1; }
+pause(){ printf '\n'; read -r -p "Tekan Enter untuk kembali..." _ || true; }
+
+ensure_dirs() {
+  mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$CACHE_DIR" "$LOG_DIR" "$REPORT_DIR"
+  chmod 700 "$DATA_DIR" "$LOG_DIR" 2>/dev/null || true
+  touch "$FAV_FILE" "$HISTORY_FILE" 2>/dev/null || true
+  chmod 600 "$FAV_FILE" "$HISTORY_FILE" 2>/dev/null || true
+}
+
+require_fzf() {
+  [ -n "$FZF_BIN" ] && [ -x "$FZF_BIN" ] || die "fzf tidak ditemukan. Pasang: go install github.com/junegunn/fzf@latest"
+  [ -f "$TOOLS_FILE" ] || die "Registry tool tidak ditemukan: $TOOLS_FILE"
+}
+
+tool_count_installed() {
+  awk -F'|' '!/^#/ && NF>=4 {print $4}' "$TOOLS_FILE" | while read -r b; do have "$b" && echo x; done | wc -l
+}
+
+tool_count_category() {
+  local cat="$1" total inst
+  total="$(awk -F'|' -v c="$cat" '!/^#/ && $1==c {n++} END{print n+0}' "$TOOLS_FILE")"
+  inst="$(awk -F'|' -v c="$cat" '!/^#/ && $1==c {print $4}' "$TOOLS_FILE" | while read -r b; do have "$b" && echo x; done | wc -l)"
+  printf '%s/%s' "$inst" "$total"
+}
+
+find_tool_line() {
+  awk -F'|' -v id="$1" '!/^#/ && $2==id {print; exit}' "$TOOLS_FILE"
+}
+
+tool_field() {
+  find_tool_line "$1" | awk -F'|' -v n="$2" '{print $n}'
+}
+
+main_header() {
+  local host iface ipaddr date_str count
+  host="$(hostname 2>/dev/null || echo '-')"
+  iface="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+  ipaddr="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+  [ -n "$iface" ] || iface="-"
+  [ -n "$ipaddr" ] || ipaddr="-"
+  date_str="$(date '+%Y-%m-%d %H:%M')"
+  count="$(tool_count_installed)"
+  if have figlet; then
+    printf '%s%s%s\n' "$C_CYAN" "$(figlet -f small 'NET LAUNCHER' 2>/dev/null)" "$C_RESET"
+  else
+    printf '%sNET LAUNCHER%s\n' "$C_CYAN$C_BOLD" "$C_RESET"
+  fi
+  printf '%sHost:%s %s  %sIP:%s %s\n' \
+    "$C_DIM" "$C_RESET" "$host" "$C_DIM" "$C_RESET" "$ipaddr"
+  printf '%sIface:%s %s  %sTool:%s %s  %s%s%s\n' \
+    "$C_DIM" "$C_RESET" "$iface" "$C_DIM" "$C_RESET" "$count" \
+    "$C_DIM" "$date_str" "$C_RESET"
+}
+
+tool_info() {
+  local id="$1" line cat label binary template desc help sudo arg_prompt mode examples status
+  line="$(find_tool_line "$id")"
+  [ -n "$line" ] || { err "Tool tidak ditemukan: $id"; return 1; }
+  IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
+  if have "$binary"; then status="${C_GREEN}✓ terpasang${C_RESET}"; else status="${C_RED}✗ belum terpasang${C_RESET}"; fi
+  printf '%s%s%s\n' "$C_BOLD" "$label" "$C_RESET"
+  printf '%sKategori:%s %s\n' "$C_DIM" "$C_RESET" "$cat"
+  printf '%sStatus:%s %b\n' "$C_DIM" "$C_RESET" "$status"
+  printf '%sBinary:%s %s\n' "$C_DIM" "$C_RESET" "$binary"
+  printf '%sPerintah:%s %s\n' "$C_DIM" "$C_RESET" "${template:-$binary}"
+  printf '%sBantuan:%s %s\n' "$C_DIM" "$C_RESET" "$help"
+  if [ "$sudo" = "1" ]; then printf '%sSudo:%s ya (prompt terminal)\n' "$C_DIM" "$C_RESET"; else printf '%sSudo:%s tidak\n' "$C_DIM" "$C_RESET"; fi
+  printf '\n%s%s%s\n' "$C_WHITE" "$desc" "$C_RESET"
+  [ -n "$examples" ] && printf '\n%sContoh:%s %s\n' "$C_DIM" "$C_RESET" "$examples"
+  printf '\n%sEnter: buka aksi tool%s\n' "$C_DIM" "$C_RESET"
+}
+
+preview_tool() {
+  tool_info "$1"
+}
+
+preview_category() {
+  local id="$1" cat
+  case "$id" in
+    favorit)
+      printf '%s★ Favorit%s\n\nTool yang Anda tandai bintang.\n\nTambahkan dari menu aksi tool.\n' "$C_MAGENTA$C_BOLD" "$C_RESET" ;;
+    riwayat)
+      printf '%s↺ Riwayat%s\n\n100 perintah terakhir. Pilih untuk menjalankan ulang.\n' "$C_BLUE$C_BOLD" "$C_RESET" ;;
+    wordlist)
+      printf '%s▤ Wordlist%s\n\nBrowser wordlist: rockyou, SecLists, dan wordlist Indonesia.\n\nAksi: salin path, buka, statistik.\n' "$C_CYAN$C_BOLD" "$C_RESET" ;;
+    resep)
+      printf '%s⚙ Resep Otomasi%s\n\nAlur kerja aman: cek koneksi, info jaringan, scan target berizin, capture, DNS, statistik wordlist, laporan.\n' "$C_YELLOW$C_BOLD" "$C_RESET" ;;
+    doctor)
+      printf '%s✚ Doctor%s\n\nCek dependensi, tool, wordlist, hackingtool, dan akses sudo.\n' "$C_GREEN$C_BOLD" "$C_RESET" ;;
+    update)
+      printf '%s↑ Update%s\n\nUpdate hackingtool via git + pipx dan refresh index wordlist.\n' "$C_GREEN$C_BOLD" "$C_RESET" ;;
+    help)
+      printf '%s? Bantuan%s\n\nPanduan lengkap penggunaan NetLauncher.\n' "$C_YELLOW$C_BOLD" "$C_RESET" ;;
+    *)
+      cat="${CAT_NAMES[$id]:-$id}"
+      printf '%s%s%s\n\n%s\n\n' "$C_CYAN$C_BOLD" "$cat" "$C_RESET" "${CAT_DESC[$id]:-}"
+      awk -F'|' -v c="$id" '!/^#/ && $1==c {print $3 "|" $4 "|" $6}' "$TOOLS_FILE" |
+      while IFS='|' read -r label binary desc; do
+        if have "$binary"; then printf '%s✓%s %-28s %s%s%s\n' "$C_GREEN" "$C_RESET" "$label" "$C_DIM" "$desc" "$C_RESET"; else printf '%s✗%s %-28s %s%s%s\n' "$C_RED" "$C_RESET" "$label" "$C_DIM" "$desc" "$C_RESET"; fi
+      done
+      printf '\n%sEnter: buka kategori%s\n' "$C_DIM" "$C_RESET"
+      ;;
+  esac
+}
+
+main_menu() {
+  local file sel header
+  file="$(mktemp)"
+  header="$(main_header)"
+  {
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Diagnostik Jaringan" "$C_DIM" "$(tool_count_category diagnostik)" "$C_RESET" "diagnostik"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "DNS & Web" "$C_DIM" "$(tool_count_category dns)" "$C_RESET" "dns"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Interface & Routing" "$C_DIM" "$(tool_count_category interface)" "$C_RESET" "interface"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Pemindaian & Monitoring" "$C_DIM" "$(tool_count_category scan)" "$C_RESET" "scan"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Wireless (Berizin)" "$C_DIM" "$(tool_count_category wireless)" "$C_RESET" "wireless"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Tool Keamanan (Berizin)" "$C_DIM" "$(tool_count_category security)" "$C_RESET" "security"
+    printf '%s▸%s  %-28s %s(%s)%s\t%s\n' "$C_CYAN" "$C_RESET" "Hackingtool" "$C_DIM" "$(tool_count_category hackingtool)" "$C_RESET" "hackingtool"
+    printf '%s★%s  %-28s %s%s\n' "$C_MAGENTA" "$C_RESET" "Favorit" "$C_DIM" "tool yang ditandai"$'\t'"favorit"
+    printf '%s↺%s  %-28s %s%s\n' "$C_BLUE" "$C_RESET" "Riwayat" "$C_DIM" "100 perintah terakhir"$'\t'"riwayat"
+    printf '%s▤%s  %-28s %s%s\n' "$C_CYAN" "$C_RESET" "Wordlist" "$C_DIM" "rockyou, SecLists, Indonesia"$'\t'"wordlist"
+    printf '%s⚙%s  %-28s %s%s\n' "$C_YELLOW" "$C_RESET" "Resep Otomasi" "$C_DIM" "alur kerja aman"$'\t'"resep"
+    printf '%s✚%s  %-28s %s%s\n' "$C_GREEN" "$C_RESET" "Doctor" "$C_DIM" "cek dependensi"$'\t'"doctor"
+    printf '%s↑%s  %-28s %s%s\n' "$C_GREEN" "$C_RESET" "Update" "$C_DIM" "hackingtool + wordlist"$'\t'"update"
+    printf '%s?%s  %-28s %s%s\n' "$C_YELLOW" "$C_RESET" "Bantuan" "$C_DIM" "panduan lengkap"$'\t'"help"
+    printf '%s×%s  %-28s %s%s\n' "$C_RED" "$C_RESET" "Keluar" "$C_DIM" "tutup launcher"$'\t'"quit"
+  } > "$file"
+  sel="$("$FZF_BIN" --ansi --height=88% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Pilih ▸ ' --pointer='▶' --marker='✓' \
+    --header="$header" --header-first \
+    --delimiter=$'\t' --with-nth=1 --no-sort \
+    --preview="$SELF --preview-category {2}" \
+    --preview-window='right:55%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 1
+  printf '%s\n' "$sel" | awk -F'\t' '{print $2}'
+}
+
+category_menu() {
+  local cat="$1" file sel id header
+  file="$(mktemp)"
+  awk -F'|' -v c="$cat" '!/^#/ && $1==c {print}' "$TOOLS_FILE" |
+  while IFS='|' read -r category id label binary template desc help sudo arg_prompt mode examples; do
+    if have "$binary"; then status="${C_GREEN}✓${C_RESET}"; else status="${C_RED}✗${C_RESET}"; fi
+    printf '%s  %-30s %s%s%s\t%s\n' "$status" "$label" "$C_DIM" "$desc" "$C_RESET" "$id"
+  done > "$file"
+  header="$(printf '%s%s%s\n%sEnter: aksi tool | Esc: kembali%s' "$C_BOLD" "${CAT_NAMES[$cat]:-$cat}" "$C_RESET" "$C_DIM" "$C_RESET")"
+  sel="$("$FZF_BIN" --ansi --height=88% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Tool ▸ ' --pointer='▶' \
+    --header="$header" --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-tool {2}" \
+    --preview-window='right:58%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  id="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  tool_action_menu "$id"
+}
+
+tool_action_menu() {
+  local id="$1" file sel action label binary status fav_label
+  label="$(tool_field "$id" 3)"
+  binary="$(tool_field "$id" 4)"
+  if have "$binary"; then status="✓ terpasang"; else status="✗ belum terpasang"; fi
+  if is_fav "$id"; then fav_label="★ Hapus dari favorit"; else fav_label="★ Tambah ke favorit"; fi
+  file="$(mktemp)"
+  {
+    printf '%s▶%s  Jalankan\t%s\n' "$C_GREEN" "$C_RESET" "run"
+    printf '%s⌨%s  Jalankan dengan argumen\t%s\n' "$C_CYAN" "$C_RESET" "args"
+    printf '%s?%s  Bantuan tool\t%s\n' "$C_YELLOW" "$C_RESET" "help"
+    printf '%s▤%s  Contoh penggunaan\t%s\n' "$C_BLUE" "$C_RESET" "examples"
+    printf '%s%s%s\t%s\n' "$C_MAGENTA" "$fav_label" "$C_RESET" "fav"
+    printf '%s←%s  Kembali\t%s\n' "$C_DIM" "$C_RESET" "back"
+  } > "$file"
+  sel="$("$FZF_BIN" --ansi --height=70% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Aksi ▸ ' --pointer='▶' \
+    --header="$label  |  $status" --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-tool $id" \
+    --preview-window='right:58%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  action="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  case "$action" in
+    run) run_tool "$id" ;;
+    args) run_tool_args "$id" ;;
+    help) tool_help "$id" ;;
+    examples) show_examples "$id" ;;
+    fav) toggle_fav "$id" ;;
+    *) return 0 ;;
+  esac
+}
+
+execute_command() {
+  local id="$1" label="$2" mode="$3" sudo_flag="$4" cmd="$5" log_file rc
+  if [ "$sudo_flag" = "1" ]; then
+    warn "Tool ini meminta sudo; Anda akan diminta password di terminal."
+  fi
+  printf '%sMenjalankan:%s %s\n' "$C_DIM" "$C_RESET" "$cmd"
+  printf '%s\t%s\t%s\n' "$(date -Is)" "$id" "$cmd" >> "$HISTORY_FILE"
+  log_file="$LOG_DIR/$(date +%Y%m%d-%H%M%S)-$id.log"
+  {
+    printf '# %s\n# tool: %s\n# command: %s\n# user: %s\n# host: %s\n\n' \
+      "$(date -Is)" "$label" "$cmd" "${USER:-unknown}" "$(hostname 2>/dev/null || echo '-')"
+  } > "$log_file"
+  if [ "$mode" = "gui" ]; then
+    if have setsid; then
+      setsid bash -c "$cmd" >/dev/null 2>&1 &
+    else
+      nohup bash -c "$cmd" >/dev/null 2>&1 &
+    fi
+    ok "Dijalankan di background (GUI)."
+  else
+    eval "$cmd"
+    rc=$?
+    printf '\n# exit=%s\n' "$rc" >> "$log_file"
+    stty sane 2>/dev/null || true
+    printf '\n%sExit code:%s %s\n' "$C_DIM" "$C_RESET" "$rc"
+  fi
+  printf 'Log: %s\n' "$log_file"
+  pause
+}
+
+run_tool() {
+  local id="$1" extra="${2:-}" line cat label binary template desc help sudo arg_prompt mode examples cmd arg quoted
+  line="$(find_tool_line "$id")"
+  [ -n "$line" ] || { err "Tool tidak ditemukan: $id"; pause; return 1; }
+  IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
+  have "$binary" || { err "$label belum terpasang (binary: $binary)."; pause; return 1; }
+  cmd="${template:-$binary}"
+  if [ -n "$extra" ]; then
+    cmd="$cmd $extra"
+  elif [ -n "$arg_prompt" ] && [[ "$cmd" == *"%s"* ]]; then
+    printf '%s%s%s\n' "$C_CYAN" "$desc" "$C_RESET"
+    read -r -p "$arg_prompt: " arg || true
+    [ -n "$arg" ] || { warn "Dibatalkan."; return 0; }
+    quoted="$(printf '%q' "$arg")"
+    cmd="${cmd//%s/$quoted}"
+  fi
+  execute_command "$id" "$label" "$mode" "$sudo" "$cmd"
+}
+
+run_tool_args() {
+  local id="$1" line cat label binary template desc help sudo arg_prompt mode examples cmd args
+  line="$(find_tool_line "$id")"
+  [ -n "$line" ] || { err "Tool tidak ditemukan: $id"; pause; return 1; }
+  IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
+  have "$binary" || { err "$label belum terpasang (binary: $binary)."; pause; return 1; }
+  printf '%s%s%s\n' "$C_CYAN" "$desc" "$C_RESET"
+  printf '%sBantuan cepat:%s %s\n' "$C_DIM" "$C_RESET" "$help"
+  read -r -p "Argumen tambahan: " args || true
+  [ -n "$args" ] || { warn "Dibatalkan."; return 0; }
+  cmd="${template:-$binary}"
+  if [[ "$cmd" == *"%s"* ]]; then
+    cmd="${cmd//%s/$args}"
+  else
+    cmd="$cmd $args"
+  fi
+  execute_command "$id" "$label" "$mode" "$sudo" "$cmd"
+}
+
+tool_help() {
+  local id="$1" help
+  help="$(tool_field "$id" 7)"
+  [ -n "$help" ] || { warn "Bantuan tidak tersedia."; pause; return 0; }
+  printf '%sMenjalankan bantuan:%s %s\n' "$C_DIM" "$C_RESET" "$help"
+  if [[ "$help" == man\ * ]]; then
+    eval "$help"
+  elif have less; then
+    eval "$help" 2>&1 | less -R
+  else
+    eval "$help" 2>&1
+  fi
+  pause
+}
+
+show_examples() {
+  local id="$1" line cat label binary template desc help sudo arg_prompt mode examples
+  line="$(find_tool_line "$id")"
+  [ -n "$line" ] || return 1
+  IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
+  printf '%s%s%s\n\n' "$C_BOLD" "$label" "$C_RESET"
+  printf '%sKategori:%s %s\n' "$C_DIM" "$C_RESET" "$cat"
+  printf '%sPerintah:%s %s\n' "$C_DIM" "$C_RESET" "${template:-$binary}"
+  printf '%sBantuan:%s %s\n' "$C_DIM" "$C_RESET" "$help"
+  printf '\n%sContoh:%s\n%s\n' "$C_DIM" "$C_RESET" "${examples:-(lihat bantuan tool)}"
+  pause
+}
+
+is_fav() {
+  grep -qxF "$1" "$FAV_FILE" 2>/dev/null
+}
+
+toggle_fav() {
+  local id="$1" tmp
+  tmp="$(mktemp)"
+  if is_fav "$id"; then
+    grep -vxF "$id" "$FAV_FILE" > "$tmp" || true
+    mv "$tmp" "$FAV_FILE"
+    ok "Dihapus dari favorit."
+  else
+    printf '%s\n' "$id" >> "$FAV_FILE"
+    rm -f "$tmp"
+    ok "Ditambahkan ke favorit."
+  fi
+  pause
+}
+
+favorites_menu() {
+  local file sel id line label binary desc status
+  [ -s "$FAV_FILE" ] || { warn "Belum ada favorit. Tambahkan dari menu aksi tool."; pause; return 0; }
+  file="$(mktemp)"
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    line="$(find_tool_line "$id")"
+    [ -n "$line" ] || continue
+    IFS='|' read -r _ _ label binary _ desc _ _ _ _ _ <<< "$line"
+    if have "$binary"; then status="${C_GREEN}✓${C_RESET}"; else status="${C_RED}✗${C_RESET}"; fi
+    printf '%s  %-30s %s%s%s\t%s\n' "$status" "$label" "$C_DIM" "$desc" "$C_RESET" "$id"
+  done < "$FAV_FILE" > "$file"
+  sel="$("$FZF_BIN" --ansi --height=80% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Favorit ▸ ' --pointer='▶' \
+    --header='Enter: aksi tool | Esc: kembali' --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-tool {2}" \
+    --preview-window='right:58%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  id="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  tool_action_menu "$id"
+}
+
+history_menu() {
+  local file sel cmd ans
+  [ -s "$HISTORY_FILE" ] || { warn "Riwayat masih kosong."; pause; return 0; }
+  file="$(mktemp)"
+  if have tac; then
+    tail -n 100 "$HISTORY_FILE" | tac | awk -F'\t' '{printf "%s  %-16s %s\t%s\n", $1, $2, substr($3,1,70), $3}' > "$file"
+  else
+    tail -n 100 "$HISTORY_FILE" | awk -F'\t' '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}' | awk -F'\t' '{printf "%s  %-16s %s\t%s\n", $1, $2, substr($3,1,70), $3}' > "$file"
+  fi
+  sel="$("$FZF_BIN" --ansi --height=80% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Riwayat ▸ ' --pointer='▶' \
+    --header='Enter: jalankan ulang | Esc: kembali' --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  cmd="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  [ -n "$cmd" ] || return 0
+  printf '%sPerintah:%s %s\n' "$C_DIM" "$C_RESET" "$cmd"
+  read -r -p "Jalankan ulang? (y/N): " ans || true
+  if [[ "$ans" =~ ^[yY]$ ]]; then
+    execute_command "history" "Riwayat" "term" "0" "$cmd"
+  fi
+}
+
+WL_SEEN_FILE=""
+WL_TMP=""
+
+add_wordlist() {
+  local name="$1" path="$2" category="$3" source="$4" license="$5" real lines size
+  [ -f "$path" ] || return 0
+  real="$(readlink -f "$path" 2>/dev/null || printf '%s' "$path")"
+  grep -qxF "$real" "$WL_SEEN_FILE" 2>/dev/null && return 0
+  printf '%s\n' "$real" >> "$WL_SEEN_FILE"
+  lines="$(wc -l < "$path" 2>/dev/null || echo 0)"
+  lines="${lines//[!0-9]/}"
+  [ -n "$lines" ] || lines=0
+  size="$(du -h "$path" 2>/dev/null | awk '{print $1}')"
+  [ -n "$size" ] || size="?"
+  printf '%s|%s|%s|%s|%s|%s|%s\n' "$name" "$path" "$category" "$lines" "$size" "$source" "$license" >> "$WL_TMP"
+}
+
+add_dir() {
+  local dir="$1" pattern="$2" category="$3" source="$4" license="$5" max="${6:-20}" f
+  [ -d "$dir" ] || return 0
+  while IFS= read -r f; do
+    add_wordlist "$(basename "$f")" "$f" "$category" "$source" "$license"
+  done < <(find "$dir" -maxdepth 1 -type f -name "$pattern" 2>/dev/null | sort | head -n "$max")
+}
+
+wordlist_refresh() {
+  local f n
+  WL_TMP="$(mktemp)"
+  WL_SEEN_FILE="$(mktemp)"
+  printf '# name|path|category|lines|size|source|license\n' > "$WL_TMP"
+  add_wordlist "rockyou" "$HOME/wordlists/rockyou.txt" "Password" "Kali wordlists" "Tidak jelas"
+  add_wordlist "Indonesian Pwdb Top 150" "$HOME/wordlists/indonesian/indonesian-pwdb-top150.txt" "Password ID" "SecLists" "MIT"
+  for f in "$HOME"/wordlists/indonesian/geovedi/*.lst; do
+    [ -f "$f" ] || continue
+    add_wordlist "$(basename "$f")" "$f" "Bahasa ID" "geovedi/indonesian-wordlist" "Public Domain"
+  done
+  add_wordlist "KBBI v6.1.0" "$HOME/wordlists/indonesian/kbbi/all_entries_v6.1.0.txt" "Bahasa ID" "aryakdaniswara/kbbi-v6-wordlist" "Tidak dinyatakan"
+  add_wordlist "REI Indonesia Password" "$HOME/wordlists/indonesian/elliottophellia/rei-indonesia-wordlist.txt" "Password ID" "elliottophellia/wordlist" "CC BY-SA 4.0"
+  add_wordlist "John password.lst" "/usr/share/john/password.lst" "Password" "John the Ripper" "Ikuti paket"
+  add_wordlist "Nmap passwords.lst" "/usr/share/nmap/nselib/data/passwords.lst" "Password" "Nmap" "Ikuti paket"
+  add_wordlist "SQLMap wordlist" "/usr/share/sqlmap/data/txt/wordlist.txt" "Web" "SQLMap" "Ikuti paket"
+  add_wordlist "SecLists names" "/usr/share/seclists/Usernames/Names/names.txt" "Username" "SecLists" "MIT"
+  add_wordlist "SecLists top usernames" "/usr/share/seclists/Usernames/top-usernames-shortlist.txt" "Username" "SecLists" "MIT"
+  add_dir "/usr/share/seclists/Passwords/Common-Credentials" "*.txt" "Password" "SecLists" "MIT" 40
+  add_dir "/usr/share/seclists/Passwords/Common-Credentials/Language-Specific" "*.txt" "Password" "SecLists" "MIT" 20
+  add_dir "/usr/share/seclists/Discovery/Web-Content" "*.txt" "Web Content" "SecLists" "MIT" 25
+  add_dir "/usr/share/seclists/Usernames" "*.txt" "Username" "SecLists" "MIT" 15
+  add_dir "/usr/share/dirb/wordlists" "*.txt" "Web Content" "dirb" "Ikuti paket" 10
+  add_dir "/usr/share/dirbuster/wordlists" "*.txt" "Web Content" "DirBuster" "Ikuti paket" 10
+  add_dir "/usr/share/wfuzz/wordlist" "*.txt" "Web Content" "Wfuzz" "Ikuti paket" 10
+  add_dir "/usr/share/metasploit-framework/data/wordlists" "*.txt" "Password/Umum" "Metasploit" "Ikuti paket" 15
+  add_dir "/usr/share/fern-wifi-cracker/extras/wordlists" "*.txt" "Wireless" "Fern WiFi" "Ikuti paket" 10
+  mv "$WL_TMP" "$WORDLISTS_FILE"
+  chmod 600 "$WORDLISTS_FILE"
+  rm -f "$WL_SEEN_FILE"
+  n="$(awk -F'|' '!/^#/ && NF>1 {n++} END{print n+0}' "$WORDLISTS_FILE")"
+  ok "Index wordlist diperbarui: $n entri."
+}
+
+wordlist_menu() {
+  local mode="${1:-}" file sel path
+  if [ "$mode" = "refresh" ]; then wordlist_refresh; return 0; fi
+  [ -s "$WORDLISTS_FILE" ] || wordlist_refresh
+  file="$(mktemp)"
+  awk -F'|' '!/^#/ && NF>=7 {printf "%s  [%s]  %s baris  %s\t%s\n", $1, $3, $4, $5, $2}' "$WORDLISTS_FILE" > "$file"
+  sel="$("$FZF_BIN" --ansi --height=88% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Wordlist ▸ ' --pointer='▶' \
+    --header='Enter: aksi | Ketik untuk mencari | Esc: kembali' --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-wordlist {2}" \
+    --preview-window='right:58%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  path="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  wordlist_action_menu "$path"
+}
+
+preview_wordlist() {
+  local path="$1" line name category lines size source license
+  line="$(awk -F'|' -v p="$path" '!/^#/ && $2==p {print; exit}' "$WORDLISTS_FILE")"
+  if [ -n "$line" ]; then
+    IFS='|' read -r name _ category lines size source license <<< "$line"
+    printf '%s%s%s\n' "$C_BOLD" "$name" "$C_RESET"
+    printf 'Path: %s\n' "$path"
+    printf 'Kategori: %s | Baris: %s | Ukuran: %s\n' "$category" "$lines" "$size"
+    printf 'Sumber: %s | Lisensi: %s\n\n' "$source" "$license"
+  else
+    printf '%s\n\n' "$path"
+  fi
+  printf '%s--- 20 baris pertama ---%s\n' "$C_DIM" "$C_RESET"
+  head -n 20 "$path" 2>/dev/null
+}
+
+wordlist_action_menu() {
+  local path="$1" file sel action qpath
+  [ -f "$path" ] || { err "File tidak ditemukan: $path"; pause; return 1; }
+  qpath="$(printf '%q' "$path")"
+  file="$(mktemp)"
+  {
+    printf '%s⧉%s  Salin path\t%s\n' "$C_CYAN" "$C_RESET" "copy"
+    printf '%s▤%s  Buka di less\t%s\n' "$C_BLUE" "$C_RESET" "open"
+    printf '%sΣ%s  Statistik\t%s\n' "$C_GREEN" "$C_RESET" "stats"
+    printf '%s←%s  Kembali\t%s\n' "$C_DIM" "$C_RESET" "back"
+  } > "$file"
+  sel="$("$FZF_BIN" --ansi --height=60% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Aksi wordlist ▸ ' --pointer='▶' \
+    --header="$(basename "$path")" --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-wordlist $qpath" \
+    --preview-window='right:58%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  action="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  case "$action" in
+    copy) wordlist_copy "$path" ;;
+    open) wordlist_open "$path" ;;
+    stats) wordlist_stats "$path" ;;
+    *) return 0 ;;
+  esac
+}
+
+wordlist_copy() {
+  local path="$1"
+  if have wl-copy; then
+    printf '%s' "$path" | wl-copy && ok "Path disalin ke clipboard."
+  elif have xclip; then
+    printf '%s' "$path" | xclip -selection clipboard && ok "Path disalin ke clipboard."
+  elif have xsel; then
+    printf '%s' "$path" | xsel --clipboard --input && ok "Path disalin ke clipboard."
+  elif have pbcopy; then
+    printf '%s' "$path" | pbcopy && ok "Path disalin ke clipboard."
+  else
+    warn "Clipboard tidak tersedia. Path:"
+    printf '%s\n' "$path"
+  fi
+  pause
+}
+
+wordlist_open() {
+  local path="$1"
+  if have less; then less -R "$path"; else cat "$path"; fi
+}
+
+wordlist_stats() {
+  local path="$1" lines size bytes uniq
+  lines="$(wc -l < "$path" 2>/dev/null || echo 0)"
+  size="$(du -h "$path" 2>/dev/null | awk '{print $1}')"
+  bytes="$(stat -c%s "$path" 2>/dev/null || echo 0)"
+  printf '%s%s%s\n' "$C_BOLD" "$(basename "$path")" "$C_RESET"
+  printf 'Path: %s\n' "$path"
+  printf 'Baris: %s\nUkuran: %s\n' "$lines" "$size"
+  printf '\n5 baris pertama:\n'
+  head -n 5 "$path" 2>/dev/null
+  printf '\n5 baris terakhir:\n'
+  tail -n 5 "$path" 2>/dev/null
+  if [ "$bytes" -lt 52428800 ]; then
+    uniq="$(LC_ALL=C sort -u "$path" | wc -l)"
+    printf '\nBaris unik: %s\n' "$uniq"
+  else
+    printf '\nBaris unik: dilewati (file > 50 MB)\n'
+  fi
+  pause
+}
+
+recipe_log_init() {
+  local name="$1" log
+  log="$LOG_DIR/$(date +%Y%m%d-%H%M%S)-$name.log"
+  printf '# %s | recipe: %s\n# user: %s | host: %s\n\n' \
+    "$(date -Is)" "$name" "${USER:-unknown}" "$(hostname 2>/dev/null || echo '-')" > "$log"
+  printf '%s\t%s\t%s\n' "$(date -Is)" "recipe:$name" "netlauncher recipe $name" >> "$HISTORY_FILE"
+  printf '%s' "$log"
+}
+
+recipe_cek_koneksi() {
+  local log gw
+  log="$(recipe_log_init cek-koneksi)"
+  {
+    echo "== Cek Koneksi =="
+    gw="$(ip route 2>/dev/null | awk '/default/ {print $3; exit}')"
+    echo "Gateway: ${gw:--}"
+    if [ -n "$gw" ] && have ping; then
+      echo; echo "-- ping gateway --"; ping -c 4 "$gw"
+    fi
+    if have ping; then echo; echo "-- ping 1.1.1.1 --"; ping -c 4 1.1.1.1; fi
+    if have dig; then echo; echo "-- DNS example.com --"; dig +short A example.com; fi
+    if have curl; then echo; echo "-- HTTP example.com --"; curl -IsS --max-time 8 https://example.com | head -n 5; fi
+  } 2>&1 | tee -a "$log"
+  echo; ok "Log: $log"; pause
+}
+
+recipe_info_jaringan() {
+  local log
+  log="$(recipe_log_init info-jaringan)"
+  {
+    echo "== Info Jaringan =="
+    echo; echo "-- ip -brief addr --"; ip -brief addr
+    echo; echo "-- ip route --"; ip route
+    echo; echo "-- iw dev --"; if have iw; then iw dev; else echo "iw tidak tersedia"; fi
+    echo; echo "-- ss -tulpn --"; ss -tulpn
+    echo; echo "-- resolv.conf --"; cat /etc/resolv.conf 2>/dev/null
+  } 2>&1 | tee -a "$log"
+  echo; ok "Log: $log"; pause
+}
+
+recipe_dns() {
+  local log domain t
+  read -r -p "Domain: " domain || true
+  [ -n "$domain" ] || { warn "Dibatalkan."; return 0; }
+  have dig || { err "dig belum terpasang."; pause; return 1; }
+  log="$(recipe_log_init dns)"
+  {
+    echo "== DNS: $domain =="
+    for t in A MX NS TXT; do
+      echo; echo "-- $t --"; dig +short "$t" "$domain"
+    done
+  } 2>&1 | tee -a "$log"
+  echo; ok "Log: $log"; pause
+}
+
+recipe_scan_target() {
+  local log target ans
+  have nmap || { err "nmap belum terpasang."; pause; return 1; }
+  read -r -p "Target (default 127.0.0.1): " target || true
+  target="${target:-127.0.0.1}"
+  printf '%sTarget:%s %s\n' "$C_DIM" "$C_RESET" "$target"
+  printf '%sPerintah:%s nmap -sV -T4 --top-ports 100 %s\n' "$C_DIM" "$C_RESET" "$target"
+  read -r -p "Saya berwenang memindai target ini? (y/N): " ans || true
+  [[ "$ans" =~ ^[yY]$ ]] || { warn "Dibatalkan."; return 0; }
+  log="$(recipe_log_init scan-target)"
+  {
+    echo "== Scan target: $target =="
+    echo "# nmap -sV -T4 --top-ports 100 $target"
+    nmap -sV -T4 --top-ports 100 "$target"
+  } 2>&1 | tee -a "$log"
+  echo; ok "Log: $log"; pause
+}
+
+recipe_capture() {
+  local log iface dur out ans input
+  have tcpdump || { err "tcpdump belum terpasang."; pause; return 1; }
+  have sudo || { err "sudo tidak tersedia."; pause; return 1; }
+  echo "Interface tersedia:"
+  ip -brief link 2>/dev/null | awk '{print "  - " $1}'
+  iface="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+  read -r -p "Interface (default ${iface:--}): " input || true
+  iface="${input:-$iface}"
+  [ -n "$iface" ] || { warn "Interface tidak ditentukan."; return 0; }
+  read -r -p "Durasi detik (default 30): " dur || true
+  dur="${dur:-30}"
+  [[ "$dur" =~ ^[0-9]+$ ]] || { err "Durasi harus angka."; return 1; }
+  out="$HOME/capture-$(date +%Y%m%d-%H%M%S).pcap"
+  printf '%sPerintah:%s sudo timeout %s tcpdump -i %s -w %s\n' "$C_DIM" "$C_RESET" "$dur" "$iface" "$out"
+  read -r -p "Mulai capture? (y/N): " ans || true
+  [[ "$ans" =~ ^[yY]$ ]] || { warn "Dibatalkan."; return 0; }
+  log="$(recipe_log_init capture)"
+  printf '# sudo timeout %s tcpdump -i %s -w %s\n' "$dur" "$iface" "$out" >> "$log"
+  sudo timeout "$dur" tcpdump -i "$iface" -w "$out" 2>&1 | tee -a "$log"
+  [ -f "$out" ] && ok "Capture disimpan: $out"
+  ok "Log: $log"; pause
+}
+
+recipe_wordlist_stats() {
+  local path
+  [ -s "$WORDLISTS_FILE" ] || wordlist_refresh
+  path="$(awk -F'|' '!/^#/ && NF>=7 {print $2}' "$WORDLISTS_FILE" | \
+    "$FZF_BIN" --height=70% --layout=reverse --border=rounded \
+      --prompt='  Wordlist ▸ ' --pointer='▶' \
+      --header='Pilih wordlist untuk statistik | Esc: batal' --header-first)"
+  [ -n "$path" ] || { warn "Dibatalkan."; return 0; }
+  wordlist_stats "$path"
+}
+
+recipe_laporan() {
+  local out count f
+  out="$REPORT_DIR/laporan-$(date +%Y%m%d-%H%M%S).md"
+  mkdir -p "$REPORT_DIR"
+  {
+    echo "# Laporan NetLauncher"
+    echo
+    echo "- Tanggal: $(date -Is)"
+    echo "- Host: $(hostname 2>/dev/null || echo '-')"
+    echo "- User: ${USER:-unknown}"
+    echo "- IP: $(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+    echo
+    echo "## Log 24 Jam Terakhir"
+    echo
+    count=0
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      count=$((count+1))
+      echo "### $(basename "$f")"
+      echo
+      echo '```text'
+      cat "$f"
+      echo '```'
+      echo
+    done < <(find "$LOG_DIR" -type f -mtime -1 2>/dev/null | sort -r | head -n 30)
+    echo "Total log: $count"
+  } > "$out"
+  ok "Laporan dibuat: $out"
+  pause
+}
+
+preview_recipe() {
+  case "$1" in
+    cek-koneksi)
+      printf '%sCek Koneksi%s\n\nPing gateway, ping internet, query DNS, dan cek HTTP.\n\nTidak membutuhkan sudo.\n' "$C_CYAN$C_BOLD" "$C_RESET" ;;
+    info-jaringan)
+      printf '%sInfo Jaringan%s\n\nTampilkan IP, route, interface wireless, socket listening, dan resolver.\n\nTidak membutuhkan sudo.\n' "$C_CYAN$C_BOLD" "$C_RESET" ;;
+    scan-target)
+      printf '%sScan Target (Berizin)%s\n\nNmap -sV -T4 --top-ports 100 ke target yang Anda masukkan.\n\nWajib konfirmasi otorisasi sebelum scan.\n' "$C_YELLOW$C_BOLD" "$C_RESET" ;;
+    capture)
+      printf '%sCapture Trafik%s\n\ntcpdump pada interface dan durasi pilihan Anda.\n\nMembutuhkan sudo dan konfirmasi.\n' "$C_YELLOW$C_BOLD" "$C_RESET" ;;
+    dns)
+      printf '%sCek DNS%s\n\nQuery A, MX, NS, dan TXT untuk domain.\n\nTidak membutuhkan sudo.\n' "$C_CYAN$C_BOLD" "$C_RESET" ;;
+    wordlist-stats)
+      printf '%sStatistik Wordlist%s\n\nPilih wordlist, lalu lihat jumlah baris, ukuran, cuplikan, dan baris unik.\n' "$C_GREEN$C_BOLD" "$C_RESET" ;;
+    laporan)
+      printf '%sBuat Laporan%s\n\nGabungkan log 24 jam terakhir menjadi laporan Markdown di ~/laporan/.\n' "$C_GREEN$C_BOLD" "$C_RESET" ;;
+    *) printf 'Resep tidak dikenal.\n' ;;
+  esac
+}
+
+recipes_menu() {
+  local file sel recipe
+  file="$(mktemp)"
+  {
+    printf '%s▸%s  Cek Koneksi\t%s\n' "$C_CYAN" "$C_RESET" "cek-koneksi"
+    printf '%s▸%s  Info Jaringan\t%s\n' "$C_CYAN" "$C_RESET" "info-jaringan"
+    printf '%s▸%s  Scan Target (Berizin)\t%s\n' "$C_YELLOW" "$C_RESET" "scan-target"
+    printf '%s▸%s  Capture Trafik\t%s\n' "$C_YELLOW" "$C_RESET" "capture"
+    printf '%s▸%s  Cek DNS\t%s\n' "$C_CYAN" "$C_RESET" "dns"
+    printf '%s▸%s  Statistik Wordlist\t%s\n' "$C_GREEN" "$C_RESET" "wordlist-stats"
+    printf '%s▸%s  Buat Laporan\t%s\n' "$C_GREEN" "$C_RESET" "laporan"
+    printf '%s←%s  Kembali\t%s\n' "$C_DIM" "$C_RESET" "back"
+  } > "$file"
+  sel="$("$FZF_BIN" --ansi --height=75% --layout=reverse --border=rounded --info=inline \
+    --prompt='  Resep ▸ ' --pointer='▶' \
+    --header='Enter: jalankan resep | Esc: kembali' --header-first \
+    --delimiter=$'\t' --with-nth=1 \
+    --preview="$SELF --preview-recipe {2}" \
+    --preview-window='right:55%:wrap:border-left' \
+    --color="$FZF_COLORS" < "$file")"
+  rm -f "$file"
+  [ -n "$sel" ] || return 0
+  recipe="$(printf '%s\n' "$sel" | awk -F'\t' '{print $2}')"
+  [ "$recipe" = "back" ] && return 0
+  run_recipe "$recipe"
+}
+
+run_recipe() {
+  case "$1" in
+    cek-koneksi) recipe_cek_koneksi ;;
+    info-jaringan) recipe_info_jaringan ;;
+    scan-target) recipe_scan_target ;;
+    capture) recipe_capture ;;
+    dns) recipe_dns ;;
+    wordlist-stats) recipe_wordlist_stats ;;
+    laporan) recipe_laporan ;;
+    *) err "Resep tidak dikenal: $1"; pause; return 1 ;;
+  esac
+}
+
+doctor() {
+  local fails=0 c f
+  echo "== Doctor =="
+  echo
+  local cmds=(fzf git pipx python3 go ruby tmux hackingtool nmap ip ss dig curl tcpdump wireshark aircrack-ng airmon-ng)
+  for c in "${cmds[@]}"; do
+    if have "$c"; then ok "$c: $(command -v "$c")"; else err "$c: tidak ditemukan"; fails=$((fails+1)); fi
+  done
+  echo
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ok "PATH berisi ~/.local/bin" ;;
+    *) err "PATH tidak berisi ~/.local/bin"; fails=$((fails+1)) ;;
+  esac
+  for f in "$TOOLS_FILE" "$HELP_FILE" "$WORDLISTS_FILE"; do
+    if [ -s "$f" ]; then ok "File: $f"; else err "File: $f (belum ada/kosong)"; fails=$((fails+1)); fi
+  done
+  for f in "$HOME/wordlists" "$HOME/wordlists/indonesian"; do
+    if [ -d "$f" ]; then ok "Direktori: $f"; else err "Direktori: $f tidak ada"; fails=$((fails+1)); fi
+  done
+  echo
+  if have sudo; then
+    if sudo -n true 2>/dev/null; then ok "sudo: sesi aktif tanpa password"; else warn "sudo: akan meminta password saat capture"; fi
+  else
+    err "sudo tidak tersedia"; fails=$((fails+1))
+  fi
+  echo
+  if [ "$fails" -eq 0 ]; then ok "Semua komponen utama siap."; else warn "$fails komponen perlu perhatian."; fi
+  return 0
+}
+
+do_update() {
+  local repo="$HOME/tools/hackingtool"
+  echo "== Update =="
+  if [ -d "$repo/.git" ]; then
+    git -C "$repo" pull --ff-only || warn "git pull gagal (mungkin ada perubahan lokal)."
+    pipx install "$repo" --force || warn "pipx install gagal."
+  else
+    warn "Repo hackingtool tidak ditemukan di $repo."
+  fi
+  echo
+  wordlist_refresh
+  echo
+  doctor
+  pause
+}
+
+show_help() {
+  if [ -f "$HELP_FILE" ]; then
+    if have less; then less -R "$HELP_FILE"; else cat "$HELP_FILE"; fi
+  else
+    err "File bantuan tidak ditemukan: $HELP_FILE"
+  fi
+}
+
+print_cli_help() {
+  cat <<EOF
+NetLauncher $VERSION — launcher tool jaringan (authorized use only)
+
+Usage:
+  netlauncher [command]
+
+Commands:
+  (tanpa argumen)     Buka menu utama
+  help                Panduan lengkap
+  doctor              Cek dependensi dan tool
+  selftest            Validasi registry dan file
+  wordlists [refresh] Browser/index wordlist
+  update              Update hackingtool + index wordlist
+  tool <id>           Jalankan tool berdasarkan id
+  recipe <nama>       Jalankan resep otomasi
+  --version           Tampilkan versi
+  --help              Tampilkan bantuan ini
+
+Resep:
+  cek-koneksi, info-jaringan, scan-target, capture, dns, wordlist-stats, laporan
+
+Contoh:
+  netlauncher
+  netlauncher tool ping
+  netlauncher recipe cek-koneksi
+  netlauncher wordlists refresh
+EOF
+}
+
+selftest() {
+  local fails=0 line n cat id label binary template desc help sudo arg_prompt mode examples
+  echo "== Selftest =="
+  echo
+  if [ -f "$TOOLS_FILE" ]; then ok "tools.tsv ada"; else err "tools.tsv tidak ada"; fails=$((fails+1)); fi
+  n=0
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    n=$((n+1))
+    IFS='|' read -r cat id label binary template desc help sudo arg_prompt mode examples <<< "$line"
+    if [ -z "${id:-}" ] || [ -z "${binary:-}" ]; then
+      err "Baris $n tidak lengkap"; fails=$((fails+1)); continue
+    fi
+    if [ "$(awk -F'|' '{print NF}' <<< "$line")" -ne 11 ]; then
+      err "Baris $n tidak punya 11 field: $id"; fails=$((fails+1))
+    fi
+    if have "$binary"; then ok "$id ($binary)"; else warn "$id ($binary) belum terpasang"; fi
+  done < "$TOOLS_FILE"
+  echo
+  ok "$n entri registry diperiksa."
+  if [ "$fails" -eq 0 ]; then ok "Selftest selesai tanpa error."; else warn "$fails masalah ditemukan."; fi
+  return 0
+}
+
+main_menu_loop() {
+  local choice
+  while true; do
+    choice="$(main_menu)" || exit 0
+    case "$choice" in
+      quit|"") exit 0 ;;
+      favorit) favorites_menu ;;
+      riwayat) history_menu ;;
+      wordlist) wordlist_menu ;;
+      resep) recipes_menu ;;
+      doctor) doctor; pause ;;
+      update) do_update ;;
+      help) show_help ;;
+      *) category_menu "$choice" ;;
+    esac
+  done
+}
+
+main() {
+  ensure_dirs
+  case "${1:-}" in
+    "")
+      require_fzf
+      main_menu_loop
+      ;;
+    help) show_help ;;
+    doctor) doctor ;;
+    selftest) selftest ;;
+    wordlists)
+      shift
+      if [ "${1:-}" = "refresh" ]; then
+        wordlist_refresh
+      else
+        require_fzf
+        wordlist_menu
+      fi
+      ;;
+    update) do_update ;;
+    tool)
+      shift
+      [ -n "${1:-}" ] || { err "Gunakan: netlauncher tool <id>"; exit 1; }
+      run_tool "$1"
+      ;;
+    recipe)
+      shift
+      [ -n "${1:-}" ] || { err "Gunakan: netlauncher recipe <nama>"; exit 1; }
+      run_recipe "$1"
+      ;;
+    --preview-tool) preview_tool "${2:-}" ;;
+    --preview-category) preview_category "${2:-}" ;;
+    --preview-wordlist) preview_wordlist "${2:-}" ;;
+    --preview-recipe) preview_recipe "${2:-}" ;;
+    --version|-v) printf '%s %s\n' "$APP_NAME" "$VERSION" ;;
+    --help|-h) print_cli_help ;;
+    *)
+      err "Perintah tidak dikenal: $1"
+      print_cli_help
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

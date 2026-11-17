@@ -1,0 +1,36 @@
+# category|id|label|binary|template|description|help|sudo|arg_prompt|mode|examples
+diagnostik|ping|Ping|ping|ping -c 4 %s|Uji jangkauan host via ICMP.|ping -h|0|Host/target|term|ping -c 4 1.1.1.1
+diagnostik|traceroute|Traceroute|traceroute|traceroute %s|Lacak rute paket ke host.|traceroute -h|0|Host/target|term|traceroute example.com
+diagnostik|curl|Curl|curl|curl -I %s|Cek header HTTP/HTTPS.|curl --help|0|URL|term|curl -I https://example.com
+diagnostik|wget|Wget|wget|wget --spider -S %s|Cek ketersediaan URL atau file.|wget --help|0|URL|term|wget --spider -S https://example.com
+dns|dig|Dig|dig|dig %s|Query DNS (A, MX, NS, TXT).|dig -h|0|Domain|term|dig +short A example.com
+dns|nslookup|Nslookup|nslookup|nslookup %s|Query DNS interaktif.|man nslookup|0|Domain|term|nslookup example.com
+dns|whatweb|WhatWeb|whatweb|whatweb %s|Fingerprint teknologi web.|whatweb --help|0|URL|term|whatweb https://example.com
+dns|nikto|Nikto|nikto|nikto -h %s|Scan kerentanan web (target berizin).|nikto -help|0|URL|term|nikto -h https://example.com
+dns|gobuster|Gobuster|gobuster||Enumerasi direktori atau DNS (berizin).|gobuster --help|0||term|gobuster --help
+dns|ffuf|FFUF|ffuf||Fuzzing web (target berizin).|ffuf -h|0||term|ffuf -h
+dns|httpx|HTTPX|httpx||Probe HTTP/HTTPS.|httpx -h|0||term|httpx -h
+dns|nuclei|Nuclei|nuclei||Scan template kerentanan (berizin).|nuclei -h|0||term|nuclei -h
+dns|amass|Amass|amass||OSINT dan enumerasi subdomain (berizin).|amass -h|0||term|amass -h
+dns|sqlmap|SQLMap|sqlmap||Deteksi SQL injection (target berizin).|sqlmap -h|0||term|sqlmap -h
+dns|searchsploit|SearchSploit|searchsploit|searchsploit %s|Cari exploit lokal di Exploit-DB.|searchsploit -h|0|Kata kunci|term|searchsploit apache
+interface|ip-addr|IP Address|ip|ip -brief addr|Tampilkan alamat IP dan status interface.|man ip|0||term|ip -brief addr
+interface|ip-route|IP Route|ip|ip route|Tampilkan tabel routing.|man ip|0||term|ip route
+interface|ss|Socket Stat|ss|ss -tulpn|Tampilkan socket dan port listening.|man ss|0||term|ss -tulpn
+interface|netstat|Netstat|netstat|netstat -tulpn|Tampilkan koneksi dan port listening.|man netstat|0||term|netstat -tulpn
+interface|iw-dev|IW Dev|iw|iw dev|Tampilkan antarmuka wireless.|man iw|0||term|iw dev
+scan|nmap|Nmap|nmap|nmap -sV -T4 %s|Scan port dan layanan (target berizin).|nmap -h|0|Target berizin|term|nmap -sV -T4 127.0.0.1
+scan|tcpdump|Tcpdump|tcpdump|sudo tcpdump -i %s|Capture paket pada interface (butuh sudo).|tcpdump -h|1|Interface|term|sudo tcpdump -i eth0
+scan|wireshark|Wireshark|wireshark|wireshark|GUI analisis paket (butuh display).|wireshark --help|0||gui|wireshark
+wireless|airmon-ng|Airmon-ng|airmon-ng|sudo airmon-ng|Lihat dan kelola antarmuka monitor.|airmon-ng --help|1||term|sudo airmon-ng
+wireless|aircrack-ng|Aircrack-ng|aircrack-ng|sudo aircrack-ng|Suite audit WiFi (jaringan berizin).|aircrack-ng --help|1||term|sudo aircrack-ng
+wireless|kismet|Kismet|kismet|sudo kismet|Deteksi wireless dan WIDS (berizin).|kismet --help|1||term|sudo kismet
+wireless|reaver|Reaver|reaver|sudo reaver|Tool WPS untuk audit berizin.|reaver --help|1||term|sudo reaver
+wireless|wifite|Wifite|wifite|sudo wifite|Otomasi audit WiFi (jaringan berizin).|wifite --help|1||term|sudo wifite
+security|hydra|Hydra|hydra|hydra|Audit kredensial (target berizin).|hydra -h|0||term|hydra -h
+security|john|John the Ripper|john|john|Audit hash dan kata sandi (berizin).|john --help|0||term|john --help
+security|hashcat|Hashcat|hashcat|hashcat|Audit hash dan kata sandi (berizin).|hashcat --help|0||term|hashcat --help
+security|msfconsole|Metasploit Console|msfconsole|msfconsole|Konsol Metasploit Framework.|msfconsole --help|0||term|msfconsole
+hackingtool|hackingtool|Hackingtool TUI|hackingtool|hackingtool|TUI utama hackingtool (219 tool, 21 kategori).|hackingtool --help|0||term|hackingtool
+hackingtool|hackingtool-classic|Hackingtool Classic|hackingtool|hackingtool --classic|REPL klasik hackingtool.|hackingtool --help|0||term|hackingtool --classic
+hackingtool|hackingtool-help|Hackingtool Help|hackingtool|hackingtool --help|Bantuan CLI hackingtool.|hackingtool --help|0||term|hackingtool --help

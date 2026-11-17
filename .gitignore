@@ -1,0 +1,13 @@
+# State runtime per mesin
+config/favorites.tsv
+config/wordlists.tsv
+
+# Log dan arsip
+*.log
+*.tar.gz
+netlauncher-backup-*
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
