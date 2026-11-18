@@ -8,7 +8,7 @@ _netlauncher_complete() {
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   cmd="${COMP_WORDS[1]}"
 
-  local commands="search examples snippets guide flags flow workspace automation wordlists logs theme tool recipe list doctor selftest lint update help"
+  local commands="search examples snippets guide flags flow workspace findings repo-scan automation wordlists logs theme tool recipe list doctor selftest lint update help"
   local themes="cyber tokyo emerald amber"
   local flow_sub="list show run"
   local ws_sub="show set clear"

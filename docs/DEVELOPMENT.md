@@ -35,7 +35,7 @@ make lint
 `make check` menjalankan:
 
 1. `bash -n` pada `bin/netlauncher`, `lib/*.sh`, `config/automations/*.sh`, `scripts/*.sh`, `tests/smoke.sh`
-2. `tests/smoke.sh` (107 asersi: modul, registry, snippet, flag, guide, flow,
+2. `tests/smoke.sh` (117 asersi: modul, registry, snippet, flag, guide, flow,
    lint/selftest, CLI, preview lama & baru, runner, knowledge, flow, workspace, overlay, symlink)
 
 Uji manual yang disarankan setelah perubahan:

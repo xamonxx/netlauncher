@@ -40,7 +40,9 @@ Runtime data tetap di luar repo:
 - `~/.local/share/netlauncher/logs/` (rotasi otomatis > 30 hari)
 - `~/.local/share/netlauncher/history.log`
 - `~/.local/share/netlauncher/targets.history`
-- `~/.local/share/netlauncher/workspace.env`
+- `~/.local/share/netlauncher/workspace.env` (workspace tunggal legacy)
+- `~/.local/share/netlauncher/projects/*.env` + `active-project` (profil proyek, permission 600)
+- `~/.local/share/netlauncher/findings.jsonl` (temuan lokal, permission 600)
 - `~/.cache/netlauncher/`
 
 ## Struktur Modul (`lib/`)
@@ -48,7 +50,7 @@ Runtime data tetap di luar repo:
 | Modul | Tanggung Jawab |
 | --- | --- |
 | `bin/netlauncher` | Entrypoint CLI, flag global, dispatch `guide`/`flags`/`flow`/`workspace`/preview, `main_menu_loop()` |
-| `lib/core.sh` | Path & env override, overlay (`tools_files`, `snippets_files`), workspace (`load_workspace`, `save_workspace`, `workspace_active_label`), kategori, helper, registry, `confirm_authorized_action()` |
+| `lib/core.sh` | Path & env override, overlay, workspace dan profil proyek/scope, kategori, helper, registry, `confirm_authorized_action()` |
 | `lib/ui.sh` | 4 tema truecolor, `ui_splash()`, `ui_progress()`, `ui_spin()`, `ui_badge()`, `ui_fzf()` (border label memuat versi/tema/workspace) |
 | `lib/runner.sh` | `runner_exec()` PTY/tee, `runner_parse_highlights()`, `runner_suggest_next_steps()`, `runner_post_menu()`, `runner_export_markdown()` |
 | `lib/smart.sh` | `smart_net_context()`, `smart_prompt_placeholder()` (workspace prioritized), `smart_resolve_template()`, `smart_command_builder()` (integrasi Flag Builder), `smart_missing_advisor()` |
@@ -58,6 +60,7 @@ Runtime data tetap di luar repo:
 | `lib/flow.sh` | `flow_parse_file()`, `flow_run()`, `flow_create_wizard()`, `flow_ui()`, `flow_cli()`, `preview_flow()` |
 | `lib/recipes.sh` | 10 `recipe_*()`, `recipe_laporan()` (3 template), `recipes_menu()`, `automation_menu()` (integrasi flow) |
 | `lib/menu.sh` | `main_menu()`, `workspace_menu()`, `workspace_cli()`, `global_search_menu()`, `category_menu()`, `tool_action_menu()`, `execute_command()` (wrapper → `runner_exec`), `logs_menu()`, `history_menu()` |
+| `lib/workflow.sh` | JSONL findings store, deduplikasi/status/ekspor, repo scan lokal Gitleaks/Trivy/Semgrep |
 | `lib/doctor.sh` | `doctor()`, `selftest()`, `lint()` (TSV + guides + flow + syntax), `list_tools()` (`--json`, overlay), `print_cli_help()` |
 
 ## Alur eksekusi

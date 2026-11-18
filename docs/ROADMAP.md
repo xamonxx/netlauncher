@@ -41,13 +41,15 @@ Status: `[x]` selesai, `[ ]` direncanakan, `[~]` sedang dipertimbangkan.
       (runner, knowledge, flow, workspace, overlay; 11 asersi UI).
 - [x] Perbaikan binary/flag Kali: `httpx-toolkit`, `traceroute --help`, `nikto -H`, `man airmon-ng`, penanganan `nc.traditional v1.10`.
 
-## Jangka menengah (v2.2)
+## v2.2.0 (Sedang dikerjakan)
 
+- [x] Profil proyek multiproject: workspace per proyek, environment lab/staging/produksi, scope host/domain/subnet, switching CLI.
+- [x] Temuan terstruktur JSONL dengan deduplikasi, triase status, dan ekspor JSON.
+- [x] Integrasi repo scan lokal opsional untuk Gitleaks, Trivy, dan Semgrep; tidak ada instalasi otomatis.
+- [ ] Redaksi PII/secret configurable untuk seluruh format laporan.
 - [ ] Import/export favorit, riwayat, workspace, dan custom automation.
 - [ ] Pemeriksa update wordlist (tanpa mengunduh otomatis).
 - [ ] Flow scheduler / trigger berbasis event (tetap lokal, tanpa daemon).
-- [ ] Ekspor laporan ke format lain selain Markdown (mis. JSON ringkas).
-- [ ] Profil workspace multiproject dengan switching cepat.
 
 ## Eksplorasi
 

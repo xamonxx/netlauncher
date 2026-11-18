@@ -3,6 +3,12 @@ config/favorites.tsv
 config/wordlists.tsv
 config/theme.env
 
+# Data privat workspace/findings jangan pernah di-commit
+*.jsonl
+findings.json
+projects/
+active-project
+
 # Overlay lokal (per-mesin, tidak di-track)
 config/tools.local.tsv
 config/snippets.local.tsv

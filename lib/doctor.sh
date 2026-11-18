@@ -24,6 +24,7 @@ doctor() {
   gc="$(find "$GUIDES_DIR" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' ')"
   ok "Flag terkurasi: $fc entri │ Panduan: $gc file"
   ok "Automation Flow: $(flow_list_files 2>/dev/null | wc -l | tr -d ' ') file"
+  for c in gitleaks trivy semgrep; do have "$c" && ok "$c: $(command -v "$c")" || warn "$c belum terpasang (opsional, repo-scan akan melewati)"; done
   echo
   ok "Terminal: TERM=${TERM:-?} COLORTERM=${COLORTERM:-?} Tema=$THEME Animasi=$([ "${ANIM:-1}" = "1" ] && echo ON || echo OFF)"
   if have fzf; then ok "fzf versi: $(fzf --version 2>/dev/null | head -n1)"; fi
@@ -83,7 +84,9 @@ Commands:
   guide [tool_id]     Panduan resmi tool (Bahasa Indonesia)
   flags [tool_id]     Interactive Flag Builder dari referensi resmi
   flow <sub>          Automation Flow: list | show <id> | run <id> [--var K=V]
-  workspace <sub>     Target Workspace: show | set K=V ... | clear
+  workspace <sub>     Workspace/proyek: show | set K=V | create NAME | use NAME | projects | scope LIST [ENV]
+  repo-scan <dir>     Scan repo lokal: Gitleaks, Trivy, Semgrep (opsional)
+  findings <sub>      list [filter] | export
   automation          Kelola & jalankan custom automation scripts
   wordlists [refresh] Browser/index wordlist
   logs                Buka viewer log sesi & laporan
@@ -94,6 +97,9 @@ Commands:
   doctor              Cek dependensi, terminal, dan tool
   selftest            Validasi registry, snippet, dan file
   lint                Validasi tools.tsv, snippets.tsv, flags.tsv, & .flow
+  repo-scan <dir>      Scan repo lokal dengan Gitleaks/Trivy/Semgrep (jika tersedia)
+  findings list [filter] Daftar temuan terstruktur; filter severity/status
+  findings export     Ekspor temuan proyek ke JSON
   update              Update hackingtool + index wordlist
   help                Panduan lengkap
 

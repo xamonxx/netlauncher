@@ -2,6 +2,17 @@
 
 Format mengikuti Keep a Changelog; versi mengikuti SemVer selama memungkinkan.
 
+## [2.2.0] - 2026-11-18 (dalam pengembangan)
+
+### Added
+
+- Profil proyek multiproject (lab/staging/produksi) dengan workspace terpisah,
+  scope aset, CLI buat/aktifkan/list/set scope; aksi berdampak memeriksa scope.
+- Findings store lokal JSONL: deduplikasi, status triase, filter proyek, ekspor JSON.
+- `repo-scan <dir>` untuk Gitleaks, Trivy, Semgrep yang sudah terpasang; konfirmasi,
+  scope check, JSON output lokal, tanpa instalasi otomatis.
+- Menu Temuan Keamanan untuk triase status.
+
 ## [2.1.0] - 2026-11-17
 
 ### Added

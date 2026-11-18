@@ -1,7 +1,7 @@
 # lib/core.sh - Konfigurasi inti, path, helper, overlay, workspace, dan registry
 
 APP_NAME="netlauncher"
-VERSION="2.1.0"
+VERSION="2.2.0-dev"
 
 CONFIG_DIR="${NETLAUNCHER_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/netlauncher}"
 DATA_DIR="${NETLAUNCHER_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/netlauncher}"
@@ -25,6 +25,9 @@ LOG_DIR="$DATA_DIR/logs"
 HISTORY_FILE="$DATA_DIR/history.log"
 TARGET_HISTORY_FILE="$DATA_DIR/targets.history"
 WORKSPACE_FILE="$DATA_DIR/workspace.env"
+PROJECTS_DIR="$DATA_DIR/projects"
+ACTIVE_PROJECT_FILE="$DATA_DIR/active-project"
+FINDINGS_FILE="$DATA_DIR/findings.jsonl"
 REPORT_DIR="${NETLAUNCHER_REPORT_DIR:-$HOME/laporan}"
 
 FZF_BIN="${FZF_BIN:-$(command -v fzf 2>/dev/null || true)}"
@@ -78,10 +81,10 @@ pause(){ [ -t 0 ] || return 0; printf '\n'; read -r -p "Tekan Enter untuk kembal
 
 ensure_dirs() {
   mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$CACHE_DIR" "$LOG_DIR" "$REPORT_DIR" \
-    "$AUTOMATIONS_DIR" "$FLOWS_DIR" "$FLOWS_LOCAL_DIR" "$GUIDES_DIR"
-  chmod 700 "$DATA_DIR" "$LOG_DIR" 2>/dev/null || true
-  touch "$FAV_FILE" "$HISTORY_FILE" "$TARGET_HISTORY_FILE" "$WORKSPACE_FILE" 2>/dev/null || true
-  chmod 600 "$FAV_FILE" "$HISTORY_FILE" "$TARGET_HISTORY_FILE" "$WORKSPACE_FILE" 2>/dev/null || true
+    "$AUTOMATIONS_DIR" "$FLOWS_DIR" "$FLOWS_LOCAL_DIR" "$GUIDES_DIR" "$PROJECTS_DIR"
+  chmod 700 "$DATA_DIR" "$LOG_DIR" "$PROJECTS_DIR" 2>/dev/null || true
+  touch "$FAV_FILE" "$HISTORY_FILE" "$TARGET_HISTORY_FILE" "$WORKSPACE_FILE" "$FINDINGS_FILE" 2>/dev/null || true
+  chmod 600 "$FAV_FILE" "$HISTORY_FILE" "$TARGET_HISTORY_FILE" "$WORKSPACE_FILE" "$ACTIVE_PROJECT_FILE" "$FINDINGS_FILE" 2>/dev/null || true
   find "$LOG_DIR" -maxdepth 1 -type f -name '*.log' -mtime +30 -delete 2>/dev/null || true
 }
 
@@ -225,6 +228,7 @@ load_workspace() {
       WS_NOTE) WS_NOTE="$v" ;;
     esac
   done < "$WORKSPACE_FILE"
+  load_project_workspace
 }
 
 save_workspace() {
@@ -240,6 +244,7 @@ save_workspace() {
   } > "$tmp"
   mv "$tmp" "$WORKSPACE_FILE"
   chmod 600 "$WORKSPACE_FILE" 2>/dev/null || true
+  [ -n "$(active_project_name 2>/dev/null || true)" ] && save_project_workspace
 }
 
 clear_workspace() {
@@ -251,6 +256,7 @@ clear_workspace() {
   WS_NOTE=""
   : > "$WORKSPACE_FILE"
   chmod 600 "$WORKSPACE_FILE" 2>/dev/null || true
+  [ -n "$(active_project_name 2>/dev/null || true)" ] && save_project_workspace
 }
 
 workspace_active_label() {
@@ -268,6 +274,9 @@ workspace_active_label() {
     [ -n "$out" ] && out+=" │ "
     out+="$p"
   done
+  if [ -n "$(project_name 2>/dev/null || true)" ]; then
+    out="$(project_name) │ $out"
+  fi
   printf '%s' "$out"
 }
 
@@ -283,9 +292,169 @@ is_impactful_tool() {
   return 1
 }
 
+active_project_name() {
+  [ -s "$ACTIVE_PROJECT_FILE" ] && head -n 1 "$ACTIVE_PROJECT_FILE"
+}
+
+project_slug() {
+  local slug
+  slug="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+|-+$//g')"
+  [ -n "$slug" ] || return 1
+  printf '%s' "$slug"
+}
+
+project_file() {
+  local slug
+  slug="$(project_slug "$1")" || return 1
+  printf '%s/%s.env' "$PROJECTS_DIR" "$slug"
+}
+
+project_create() {
+  local name="$1" slug file scope
+  [ -n "$name" ] || die "Nama proyek wajib diisi."
+  slug="$(project_slug "$name")" || die "Nama proyek tidak valid."
+  file="$PROJECTS_DIR/$slug.env"
+  [ ! -e "$file" ] || die "Proyek sudah ada: $name"
+  printf 'PROJECT_NAME=%s\nPROJECT_SCOPE=\nPROJECT_ENV=lab\nPROJECT_NOTE=\n' "${name//$'\n'/ }" > "$file"
+  chmod 600 "$file"
+  printf '%s\n' "$slug" > "$ACTIVE_PROJECT_FILE"
+  chmod 600 "$ACTIVE_PROJECT_FILE"
+  WS_TARGET="" WS_DOMAIN="" WS_URL="" WS_SUBNET="" WS_IFACE="" WS_NOTE=""
+  save_project_workspace
+  load_workspace
+  ok "Proyek dibuat dan diaktifkan: $name"
+}
+
+project_use() {
+  local slug file
+  slug="$(project_slug "$1")" || die "Nama proyek tidak valid."
+  file="$PROJECTS_DIR/$slug.env"
+  [ -f "$file" ] || die "Proyek tidak ditemukan: $1"
+  printf '%s\n' "$slug" > "$ACTIVE_PROJECT_FILE"
+  chmod 600 "$ACTIVE_PROJECT_FILE"
+  load_workspace
+  ok "Proyek aktif: $(project_name)"
+}
+
+project_name() {
+  local file
+  file="$(active_project_file)" || return 1
+  sed -n 's/^PROJECT_NAME=//p' "$file" | head -n 1
+}
+
+active_project_file() {
+  local slug
+  slug="$(active_project_name)" || return 1
+  [ -f "$PROJECTS_DIR/$slug.env" ] || return 1
+  printf '%s/%s.env' "$PROJECTS_DIR" "$slug"
+}
+
+project_scope() {
+  local file
+  file="$(active_project_file)" || return 1
+  sed -n 's/^PROJECT_SCOPE=//p' "$file" | head -n 1
+}
+
+project_set_metadata() {
+  local scope="${1:-}" env="${2:-lab}" file tmp name note target domain url subnet iface
+  file="$(active_project_file)" || die "Tidak ada proyek aktif."
+  case "$env" in lab|staging|produksi) ;; *) die "Lingkungan harus lab, staging, atau produksi." ;; esac
+  if [ -n "$scope" ]; then
+    local saved_ws_target="$WS_TARGET" saved_ws_domain="$WS_DOMAIN" saved_ws_url="$WS_URL" saved_ws_subnet="$WS_SUBNET"
+    WS_TARGET="" WS_DOMAIN="" WS_URL="" WS_SUBNET=""
+    if [ -n "$saved_ws_target" ]; then WS_TARGET="$saved_ws_target"; elif [ -n "$saved_ws_domain" ]; then WS_DOMAIN="$saved_ws_domain"; elif [ -n "$saved_ws_url" ]; then WS_URL="$saved_ws_url"; elif [ -n "$saved_ws_subnet" ]; then WS_SUBNET="$saved_ws_subnet"; fi
+    SCOPE_VALIDATING=1 PROJECT_SCOPE_OVERRIDE="$scope" confirm_scope || { WS_TARGET="$saved_ws_target"; WS_DOMAIN="$saved_ws_domain"; WS_URL="$saved_ws_url"; WS_SUBNET="$saved_ws_subnet"; die "Cakupan baru tidak mencakup target workspace aktif."; }
+    unset SCOPE_VALIDATING PROJECT_SCOPE_OVERRIDE
+    WS_TARGET="$saved_ws_target" WS_DOMAIN="$saved_ws_domain" WS_URL="$saved_ws_url" WS_SUBNET="$saved_ws_subnet"
+  fi
+  name="$(project_name)"
+  note="$(sed -n 's/^PROJECT_NOTE=//p' "$file" | head -n 1)"
+  target="$(sed -n 's/^PROJECT_TARGET=//p' "$file" | head -n 1)"
+  domain="$(sed -n 's/^PROJECT_DOMAIN=//p' "$file" | head -n 1)"
+  url="$(sed -n 's/^PROJECT_URL=//p' "$file" | head -n 1)"
+  subnet="$(sed -n 's/^PROJECT_SUBNET=//p' "$file" | head -n 1)"
+  iface="$(sed -n 's/^PROJECT_IFACE=//p' "$file" | head -n 1)"
+  tmp="$(mktemp)"
+  printf 'PROJECT_NAME=%s\nPROJECT_SCOPE=%s\nPROJECT_ENV=%s\nPROJECT_NOTE=%s\nPROJECT_TARGET=%s\nPROJECT_DOMAIN=%s\nPROJECT_URL=%s\nPROJECT_SUBNET=%s\nPROJECT_IFACE=%s\n' \
+    "${name//$'\n'/ }" "${scope//$'\n'/ }" "$env" "${note//$'\n'/ }" \
+    "${target//$'\n'/ }" "${domain//$'\n'/ }" "${url//$'\n'/ }" "${subnet//$'\n'/ }" "${iface//$'\n'/ }" > "$tmp"
+  mv "$tmp" "$file"; chmod 600 "$file"
+  ok "Metadata proyek diperbarui."
+}
+
+project_list() {
+  local file slug name active
+  active="$(active_project_name 2>/dev/null || true)"
+  while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    slug="$(basename "$file" .env)"
+    name="$(sed -n 's/^PROJECT_NAME=//p' "$file" | head -n 1)"
+    [ "$slug" = "$active" ] && printf '* ' || printf '  '
+    printf '%s\t%s\n' "$slug" "$name"
+  done < <(find "$PROJECTS_DIR" -maxdepth 1 -type f -name '*.env' -print 2>/dev/null | sort)
+}
+
+load_project_workspace() {
+  local file k v line
+  file="$(active_project_file 2>/dev/null)" || return 0
+  WS_TARGET="" WS_DOMAIN="" WS_URL="" WS_SUBNET="" WS_IFACE="" WS_NOTE=""
+  while IFS='=' read -r k v; do
+    case "$k" in
+      PROJECT_TARGET) WS_TARGET="$v" ;;
+      PROJECT_DOMAIN) WS_DOMAIN="$v" ;;
+      PROJECT_URL) WS_URL="$v" ;;
+      PROJECT_SUBNET) WS_SUBNET="$v" ;;
+      PROJECT_IFACE) WS_IFACE="$v" ;;
+      PROJECT_NOTE) WS_NOTE="$v" ;;
+    esac
+  done < "$file"
+}
+
+save_project_workspace() {
+  local file tmp scope env note
+  file="$(active_project_file 2>/dev/null)" || return 0
+  scope="$(project_scope 2>/dev/null || true)"
+  env="$(sed -n 's/^PROJECT_ENV=//p' "$file" | head -n 1)"
+  note="${WS_NOTE//$'\n'/ }"
+  tmp="$(mktemp)"
+  {
+    printf 'PROJECT_NAME=%s\nPROJECT_SCOPE=%s\nPROJECT_ENV=%s\nPROJECT_NOTE=%s\n' \
+      "$(project_name)" "${scope//$'\n'/ }" "${env:-lab}" "$note"
+    printf 'PROJECT_TARGET=%s\nPROJECT_DOMAIN=%s\nPROJECT_URL=%s\nPROJECT_SUBNET=%s\nPROJECT_IFACE=%s\n' \
+      "${WS_TARGET//$'\n'/ }" "${WS_DOMAIN//$'\n'/ }" "${WS_URL//$'\n'/ }" \
+      "${WS_SUBNET//$'\n'/ }" "${WS_IFACE//$'\n'/ }"
+  } > "$tmp"
+  mv "$tmp" "$file"
+  chmod 600 "$file"
+}
+
+confirm_scope() {
+  local scope target token host allowed=0
+  [ -n "$(active_project_name 2>/dev/null || true)" ] || return 0
+  scope="${PROJECT_SCOPE_OVERRIDE:-$(project_scope 2>/dev/null || true)}"
+  [ -z "$scope" ] && return 0
+  target="${WS_TARGET:-${WS_DOMAIN:-${WS_URL:-${WS_SUBNET:-}}}}"
+  [ -n "$target" ] || { [ -n "${SCOPE_VALIDATING:-}" ] && return 0; err "Proyek memiliki cakupan; isi target sebelum menjalankan aksi berdampak."; return 1; }
+  host="${target#*://}"; host="${host%%/*}"; host="${host%%:*}"
+  while IFS= read -r token; do
+    token="$(sed 's/^[[:space:]]*//; s/[[:space:]]*$//' <<< "$token")"
+    [ -n "$token" ] || continue
+    case "$host" in
+      "$token"|*.$token) allowed=1 ;;
+      "$token"/*|"$token":*) allowed=1 ;;
+    esac
+    [ "$target" = "$token" ] && allowed=1
+  done < <(tr ', ' '\n\n' <<< "$scope")
+  if [ "$allowed" -ne 1 ]; then
+    err "Target '$target' tidak cocok dengan cakupan proyek: $scope"
+    return 1
+  fi
+}
+
 confirm_authorized_action() {
   local tool_id="$1" cmd="$2" sudo_flag="${3:-0}" ans
   [ "$DRY_RUN" = "1" ] && return 0
+  confirm_scope || return 1
   if [ "$sudo_flag" = "1" ] || is_impactful_tool "$tool_id" "$cmd"; then
     printf '\n%sPerintah:%s %s\n' "${C_MUTED:-}" "${C_RESET:-}" "$cmd"
     read -r -p "Saya berwenang menjalankan perintah ini pada target? (y/N): " ans || true

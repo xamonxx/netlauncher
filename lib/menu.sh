@@ -86,10 +86,10 @@ preview_category() {
       printf '%s📖 Knowledge Base Resmi Tool%s\n\nPanduan resmi Bahasa Indonesia untuk %s tool, referensi flag terkurasi, Interactive Flag Builder, dan ekstrak flag langsung dari --help/man lokal.\n\nShortcut: %sCtrl-K%s\n' \
         "$C_OK$C_BOLD" "$C_RESET" "$(tool_count_total)" "$C_WARN" "$C_RESET" ;;
     workspace)
-      printf '%s◎ Target Workspace%s\n\nSimpan TARGET, DOMAIN, URL, SUBNET, dan IFACE aktif agar dipakai otomatis oleh Smart Prompt, Flag Builder, dan Automation Flow.\n\nShortcut: %sCtrl-W%s\n' \
+      printf '%s◎ Target Workspace & Proyek%s\n\nKelola profil proyek terpisah, target workspace, dan cakupan aset yang diizinkan. Aksi berdampak diblokir bila target di luar cakupan aktif.\n\nShortcut: %sCtrl-W%s\n' \
         "$C_ACCENT$C_BOLD" "$C_RESET" "$C_WARN" "$C_RESET"
-      printf '\n%sWorkspace saat ini:%s\n' "$C_MUTED" "$C_RESET"
-      workspace_active_label 2>/dev/null | sed 's/^/  /' || printf '  (kosong)\n'
+      printf '\n%sProyek:%s %s │ %sWorkspace:%s ' "$C_MUTED" "$C_RESET" "$(project_name 2>/dev/null || echo '(tidak aktif)')" "$C_MUTED" "$C_RESET"
+      workspace_active_label 2>/dev/null || printf '(kosong)\n'
       ;;
     automation)
       printf '%s🤖 Custom Automation Scripts%s\n\nJalankan, edit, atau buat script Bash otomasi Anda sendiri di:\n%s\n' \
@@ -153,7 +153,8 @@ main_menu() {
     printf '%s🔍%s %-26s %s%s\n' "$C_PRIMARY" "$C_RESET" "Cari Semua Tool & Contoh" "$C_MUTED" "lintas kategori (^S)"$'\t'"search"
     printf '%s⌘%s  %-26s %s%s\n' "$C_ACCENT" "$C_RESET" "Contoh Perintah & Code" "$C_MUTED" "100+ snippet siap pakai (^E)"$'\t'"snippets"
     printf '%s📖%s %-26s %s%s\n' "$C_OK" "$C_RESET" "Knowledge Base Resmi" "$C_MUTED" "panduan & flag builder (^K)"$'\t'"knowledge"
-    printf '%s◎%s  %-26s %s%s\n' "$C_ACCENT" "$C_RESET" "Target Workspace" "$C_MUTED" "target aktif (^W)"$'\t'"workspace"
+    printf '%s◎%s  %-26s %s%s\n' "$C_ACCENT" "$C_RESET" "Proyek & Target Workspace" "$C_MUTED" "profil + scope (^W)"$'\t'"workspace"
+    printf '%s▣%s  %-26s %s%s\n' "$C_PRIMARY" "$C_RESET" "Temuan Keamanan" "$C_MUTED" "triase + ekspor JSON"$'\t'"findings"
     printf '%s⚙%s  %-26s %s%s\n' "$C_WARN" "$C_RESET" "Resep Otomasi Aman" "$C_MUTED" "10 alur kerja + .flow"$'\t'"resep"
     printf '%s🌊%s %-26s %s%s\n' "$C_CYAN" "$C_RESET" "Automation Flow" "$C_MUTED" "pipeline .flow deklaratif"$'\t'"flow"
     printf '%s🤖%s %-26s %s%s\n' "$C_PRIMARY" "$C_RESET" "Custom Automation" "$C_MUTED" "script bash kustom"$'\t'"automation"
@@ -566,7 +567,10 @@ logs_menu() {
 }
 
 workspace_menu() {
-  local file sel key val target domain url subnet iface note
+  local file sel key val target domain url subnet iface note pname pscope penv
+  pname="$(project_name 2>/dev/null || true)"
+  pscope="$(project_scope 2>/dev/null || true)"
+  penv="$(active_project_file 2>/dev/null || true)"
   while true; do
     file="$(mktemp)"
     {
@@ -576,6 +580,7 @@ workspace_menu() {
       printf '%s%s  Subnet    :%s %s%s\t%s\n' "$C_PRIMARY" "◎" "$C_MUTED" "${WS_SUBNET:-(kosong)}" "$C_RESET" "edit:WS_SUBNET"
       printf '%s%s  Interface :%s %s%s\t%s\n' "$C_PRIMARY" "◎" "$C_MUTED" "${WS_IFACE:-(kosong)}" "$C_RESET" "edit:WS_IFACE"
       printf '%s%s  Catatan   :%s %s%s\t%s\n' "$C_PRIMARY" "◎" "$C_MUTED" "${WS_NOTE:-(kosong)}" "$C_RESET" "edit:WS_NOTE"
+      [ -n "$pname" ] && printf '%s◎%s  Proyek: %s │ Cakupan: %s\t__PROJECT__\n' "$C_ACCENT" "$C_RESET" "$pname" "${pscope:-(belum diatur)}"
       printf '%s✓%s  Simpan Workspace\t__SAVE__\n' "$C_OK" "$C_RESET"
       printf '%s✎%s  Isi dari Konteks Jaringan Terdeteksi\t__AUTO__\n' "$C_ACCENT" "$C_RESET"
       printf '%s✗%s  Kosongkan Workspace\t__CLEAR__\n' "$C_WARN" "$C_RESET"
@@ -607,7 +612,14 @@ workspace_menu() {
           WS_NOTE) WS_NOTE="$val" ;;
         esac
         ;;
+      __PROJECT__)
+        read -r -p "Cakupan target (domain/IP/subnet, pisahkan koma): " pscope || true
+        read -r -p "Lingkungan (lab/staging/produksi): " penv || true
+        project_set_metadata "$pscope" "${penv:-lab}"
+        pscope="$(project_scope 2>/dev/null || true)"
+        ;;
       __SAVE__)
+        save_project_workspace
         save_workspace
         ok "Workspace disimpan: $WORKSPACE_FILE"
         break
@@ -633,13 +645,32 @@ workspace_cli() {
   local sub="${1:-show}" k v
   shift || true
   case "$sub" in
+    create)
+      project_create "${1:-}"
+      load_workspace
+      ;;
+    use)
+      [ -n "${1:-}" ] || die "Gunakan: netlauncher workspace use <nama>"
+      project_use "$1"
+      ;;
+    projects)
+      project_list | while IFS=$'\t' read -r slug name; do printf '%-24s %s\n' "$slug" "$name"; done
+      ;;
+    scope)
+      [ -n "$(active_project_name 2>/dev/null || true)" ] || die "Buat/aktifkan proyek dahulu."
+      project_set_metadata "${1:-}" "${2:-lab}"
+      ;;
     show)
       if ! workspace_active_label; then
         printf '(workspace kosong)\n'
       else
         printf '\n'
       fi
-      printf '%sFile:%s %s\n' "$C_MUTED" "$C_RESET" "$WORKSPACE_FILE"
+      if [ -n "$(active_project_name 2>/dev/null || true)" ]; then
+        printf 'Proyek: %s\nCakupan: %s\nFile: %s\n' "$(project_name)" "$(project_scope)" "$(active_project_file)"
+      else
+        printf '%sFile:%s %s\n' "$C_MUTED" "$C_RESET" "$WORKSPACE_FILE"
+      fi
       ;;
     set)
       [ -n "${1:-}" ] || die "Gunakan: netlauncher workspace set KEY=NILAI [KEY=NILAI ...]"
@@ -656,12 +687,23 @@ workspace_cli() {
           *) err "Kunci workspace tidak dikenal: ${k%%=*}" ;;
         esac
       done
+      if [ -n "$(active_project_name 2>/dev/null || true)" ] && ! confirm_scope; then
+        die "Workspace tidak disimpan: target di luar scope proyek."
+      fi
       save_workspace
       ok "Workspace disimpan."
       ;;
     clear)
       clear_workspace
       ok "Workspace dikosongkan."
+      ;;
+    delete)
+      local slug file active
+      [ -n "${1:-}" ] || die "Gunakan: netlauncher workspace delete <nama>"
+      slug="$(project_slug "$1")"; file="$PROJECTS_DIR/$slug.env"; active="$(active_project_name 2>/dev/null || true)"
+      [ -f "$file" ] || die "Proyek tidak ditemukan: $1"
+      [ "$active" != "$slug" ] || die "Tidak dapat menghapus proyek aktif; aktifkan proyek lain dahulu."
+      rm -f "$file"; ok "Proyek dihapus: $1"
       ;;
     *)
       require_fzf

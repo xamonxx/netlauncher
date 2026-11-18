@@ -74,7 +74,9 @@ netlauncher snippets [tool_id]    # alias examples
 netlauncher guide [tool_id]       # panduan resmi (cetak ke stdout bila non-TTY)
 netlauncher flags [tool_id]       # Interactive Flag Builder
 netlauncher flow [ui|list|show|run]  # Automation Flow
-netlauncher workspace [show|set|clear]  # Target Workspace
+netlauncher workspace [show|set|create|use|projects|scope|clear|delete]
+netlauncher findings [list|export] # triase temuan terstruktur
+netlauncher repo-scan <direktori>   # scan repo lokal, tool opsional
 netlauncher automation            # kelola custom automation scripts
 netlauncher wordlists [refresh]   # browser / refresh index wordlist
 netlauncher logs                  # viewer log sesi & laporan
@@ -100,7 +102,12 @@ netlauncher flow list
 netlauncher flow show audit-web-lengkap
 netlauncher --dry-run flow run audit-web-lengkap --var URL=https://example.com
 netlauncher flow run healthcheck-harian
-netlauncher workspace set DOMAIN=example.com SUBNET=192.168.1.0/24
+netlauncher workspace create staging-store
+netlauncher workspace scope app.example.test,192.168.1.0/24 staging
+netlauncher workspace set URL=https://app.example.test
+netlauncher repo-scan ~/src/my-project
+netlauncher findings list
+netlauncher findings export
 ```
 
 ## Resep Otomasi Aman (10 Resep)

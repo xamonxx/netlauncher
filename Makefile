@@ -15,7 +15,7 @@ help:
 	@echo "  make lint      validasi registry, snippet, dan shellcheck"
 
 syntax:
-	@bash -n bin/netlauncher lib/*.sh config/automations/*.sh scripts/*.sh tests/smoke.sh && echo "✓ syntax OK"
+	@bash -n bin/netlauncher lib/*.sh config/automations/*.sh scripts/*.sh scripts/completions/*.bash tests/smoke.sh && echo "✓ syntax OK"
 
 smoke:
 	@./tests/smoke.sh

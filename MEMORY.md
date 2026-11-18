@@ -1,7 +1,7 @@
 # NetLauncher — Memory / Project Context
 
 - **Terakhir diperbarui:** 2026-11-17
-- **Versi aktif:** 2.1.0
+- **Versi aktif:** 2.2.0-dev (berbasis rilis 2.1.0)
 - **Status:** terpasang dan terverifikasi
 - **Repo / lokasi kanonik:** `~/tools/netlauncher/`
 - **File ini:** `~/tools/netlauncher/MEMORY.md`
@@ -82,7 +82,8 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 │   ├── knowledge.sh                        # 27 panduan resmi, 205 flag, flag builder, live --help/man
 │   ├── flow.sh                             # engine .flow, wizard, pipeline runner, dashboard
 │   ├── recipes.sh                          # 10 resep aman & custom automation scripts
-│   ├── menu.sh                             # menu utama, workspace, pencarian global, aksi tool, log
+│   ├── menu.sh                             # menu utama, workspace/proyek, pencarian global, aksi tool, log
+│   ├── workflow.sh                         # findings JSONL, triase, repo scan lokal
 │   └── doctor.sh                           # doctor, selftest, lint, list (--json), update, help
 ├── config/
 │   ├── tools.tsv                           # registry 51 tool, 11 field (delimiter |)
@@ -126,7 +127,11 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 ├── logs/                                   # log per sesi, permission 700, rotasi > 30 hari
 ├── history.log                             # riwayat perintah
 ├── targets.history                         # riwayat target/domain/URL untuk Smart Picker
-└── workspace.env                           # Target Workspace (TARGET/DOMAIN/URL/SUBNET/IFACE/NOTE)
+├── workspace.env                           # Target Workspace legacy
+├── projects/*.env + active-project         # profil proyek, workspace & scope
+└── findings.jsonl                          # findings lokal terstruktur
+├── projects/*.env + active-project         # profil proyek, workspace & scope terpisah
+└── findings.jsonl                          # temuan terstruktur lokal
 
 ~/wordlists/                                # wordlist lokal
 ├── README.md                               # sumber, lisensi, SHA256
@@ -143,7 +148,7 @@ Catatan: password sudo tidak disimpan di mana pun. Resep capture meminta passwor
 Permission penting:
 
 - `~/.local/share/netlauncher/` dan `logs/`: `700`
-- `history.log`, `targets.history`, `workspace.env`, `favorites.tsv`, `wordlists.tsv`, `theme.env`, log, laporan: `600`
+- `history.log`, `targets.history`, `workspace.env`, `projects/*.env`, `active-project`, `findings.jsonl`, `favorites.tsv`, `wordlists.tsv`, `theme.env`, log, laporan: `600`
 
 ### Alur kerja repo
 
@@ -305,6 +310,16 @@ Batasan:
 ---
 
 ## 5b. Knowledge, Flag Builder & Automation Flow (v2.1.0)
+
+## 5c. Profil Proyek, Temuan & Repo Scan (v2.2.0-dev)
+
+- Profil proyek di `$DATA_DIR/projects/<slug>.env`; `$DATA_DIR/active-project` memilih proyek.
+- `workspace create|use|projects|scope|set|show|clear|delete`; scope domain/IP/path dicocokkan sebelum aksi berdampak.
+- `FINDINGS_FILE=$DATA_DIR/findings.jsonl`: JSONL lokal mode 600, deduplikasi via SHA-256, status triase, `findings list|export`, menu Temuan.
+- `repo-scan <dir>` menjalankan scanner lokal terpasang (Gitleaks/Trivy/Semgrep) setelah konfirmasi; tidak menginstal tool otomatis. Temuan scanner disimpan sebagai rujukan laporan (jangan menaruh secret mentah di terminal/log).
+- Semgrep JSON memakai `--json-output`; Gitleaks memakai `--redact`; output laporan berada di `REPORT_DIR` dengan mode 600.
+
+
 
 ### `config/flags.tsv` (205 entri, delimiter TAB, 7 field)
 

@@ -11,7 +11,7 @@ jaringan dan keamanan yang sudah terpasang di Kali Linux. UI berbahasa Indonesia
 arsitektur modular (`bin/netlauncher` + 11 modul `lib/*.sh`), registry tool,
 snippet, dan flag berbasis TSV, knowledge base + Interactive Flag Builder,
 Automation Flow deklaratif (`.flow`), Target Workspace, Modern Execution Runner,
-dan seluruh aksi berjalan lokal tanpa server. Versi aktif: **2.1.0**.
+dan seluruh aksi berjalan lokal tanpa server. Versi pengembangan: **2.2.0-dev** (baseline 2.1.0).
 
 Repo ini adalah **sumber kanonik**. Lokasi live hanyalah symlink:
 
@@ -59,7 +59,8 @@ karena symlink.
 │   ├── knowledge.sh       # 27 panduan resmi, 205 flag, flag builder, live --help/man
 │   ├── flow.sh            # engine .flow, wizard, pipeline runner, dashboard
 │   ├── recipes.sh         # 10 resep aman & custom automation scripts
-│   ├── menu.sh            # menu utama, workspace, pencarian global, aksi tool, log
+│   ├── menu.sh            # menu utama, workspace/proyek, pencarian global, aksi tool, log
+│   ├── workflow.sh        # temuan JSONL, triase, repo scan lokal
 │   └── doctor.sh          # doctor, selftest, lint, list (--json), update, help
 ├── config/
 │   ├── tools.tsv          # registry 51 tool, 11 field (delimiter |)
@@ -96,7 +97,9 @@ Data runtime tetap di luar repo:
 - `~/.local/share/netlauncher/history.log`
 - `~/.local/share/netlauncher/targets.history`
 - `~/.cache/netlauncher/`
-- `~/.local/share/netlauncher/workspace.env` (Target Workspace)
+- `~/.local/share/netlauncher/workspace.env` (Target Workspace legacy)
+- `~/.local/share/netlauncher/projects/*.env` dan `active-project` (profil proyek)
+- `~/.local/share/netlauncher/findings.jsonl` (temuan lokal, mode 600)
 - `~/wordlists/`, `~/laporan/`
 
 ## Konvensi kode

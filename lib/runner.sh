@@ -298,6 +298,10 @@ runner_export_markdown() {
     echo "- **Perintah:** \`$cmd\`"
     echo "- **Exit Code:** $rc"
     echo "- **Durasi:** ${dur}s"
+    if [ -n "$(active_project_name 2>/dev/null || true)" ]; then
+      echo "- **Proyek:** $(project_name)"
+      echo "- **Cakupan:** $(project_scope)"
+    fi
     echo
     echo "## Ringkasan Temuan"
     echo

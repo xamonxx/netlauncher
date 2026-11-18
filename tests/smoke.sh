@@ -38,7 +38,7 @@ for f in "$TOOLS" "$SNIPPETS" "$FLAGS" "$CONFIG/help.md" "$REPO/MEMORY.md" "$REP
   [ -s "$f" ] && ok "file: ${f#$REPO/}" || bad "file hilang/kosong: ${f#$REPO/}"
 done
 
-for m in core.sh ui.sh runner.sh smart.sh snippets.sh wordlists.sh knowledge.sh flow.sh recipes.sh menu.sh doctor.sh; do
+for m in core.sh ui.sh runner.sh smart.sh snippets.sh wordlists.sh knowledge.sh flow.sh recipes.sh menu.sh workflow.sh doctor.sh; do
   [ -s "$REPO/lib/$m" ] && ok "modul: lib/$m" || bad "modul hilang: lib/$m"
 done
 
@@ -88,7 +88,7 @@ contains "selftest" "Selftest selesai tanpa error" "$out"
 
 # CLI
 out="$("$BIN" --version 2>&1)"
-contains "--version" "netlauncher 2.1.0" "$out"
+contains "--version" "netlauncher 2.2.0-dev" "$out"
 out="$("$BIN" --help 2>&1)"
 contains "--help memuat tool" "tool <id>" "$out"
 contains "--help memuat recipe" "recipe <nama>" "$out"
@@ -164,13 +164,39 @@ contains "flow show" "Inventaris Port" "$out"
 out="$(NETLAUNCHER_DATA_DIR="$(mktemp -d)" "$BIN" workspace show 2>&1)"
 contains "workspace show" "workspace kosong" "$out"
 tmp_ws="$(mktemp -d)"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace create smoke-project 2>&1)"
+contains "project create" "Proyek dibuat" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace scope example.com,192.168.1.0/24 lab 2>&1)"
+contains "project scope" "Metadata proyek diperbarui" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace set DOMAIN=example.com SUBNET=192.168.1.0/24 2>&1)"
+contains "workspace set" "Workspace disimpan" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace scope evil.test lab 2>&1)"
+contains "project scope blocks active target" "tidak mencakup" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace set DOMAIN=evil.test 2>&1)"
+contains "project target scope guard" "tidak cocok" "$out"
 out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace set DOMAIN=example.com SUBNET=192.168.1.0/24 2>&1)"
 contains "workspace set" "Workspace disimpan" "$out"
 out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace show 2>&1)"
 contains "workspace show tersimpan" "example.com" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace projects 2>&1)"
+contains "workspace projects" "smoke-project" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace use smoke-project 2>&1)"
+contains "workspace use" "Proyek aktif" "$out"
 out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" workspace clear 2>&1)"
 contains "workspace clear" "dikosongkan" "$out"
+out="$(NETLAUNCHER_DATA_DIR="$tmp_ws" "$BIN" repo-scan "$REPO" 2>&1 || true)"
+contains "repo-scan scope guard" "memiliki cakupan" "$out"
 rm -rf "$tmp_ws"
+
+# Findings persistence and export
+find_data="$(mktemp -d)"
+FINDINGS_PATH="$find_data/findings.jsonl"
+NETLAUNCHER_DATA_DIR="$find_data" bash -c 'source "$1/lib/core.sh"; source "$1/lib/ui.sh"; source "$1/lib/workflow.sh"; DATA_DIR="$NETLAUNCHER_DATA_DIR"; FINDINGS_FILE="$DATA_DIR/findings.jsonl"; ensure_dirs; finding_add high "Uji temuan" "app.example.test" "smoke" "bukti aman"; findings_list' _ "$REPO" > "$find_data/out"
+grep -q 'Uji temuan' "$find_data/out" && ok "findings add/list" || bad "findings add/list"
+[ "$(stat -c %a "$FINDINGS_PATH" 2>/dev/null)" = 600 ] && ok "findings permission 600" || bad "findings permission salah"
+NETLAUNCHER_DATA_DIR="$find_data" NETLAUNCHER_REPORT_DIR="$find_data/reports" "$BIN" findings export > "$find_data/export.out"
+[ -s "$find_data/reports/"findings-*.json ] && ok "findings JSON export" || bad "findings export hilang"
+rm -rf "$find_data"
 
 # Runner modern (non-TTY: tee + exit code)
 out="$("$BIN" tool ping 127.0.0.1 2>&1)"

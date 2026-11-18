@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # netlauncher - Smart terminal launcher & automation untuk tool jaringan (authorized use only)
-# Version: 2.1.0
+# Version: 2.2.0-dev
 set -uo pipefail
 umask 077
 export PATH="$HOME/.local/bin:$PATH"
@@ -29,6 +29,8 @@ source "$LIB_DIR/flow.sh"
 source "$LIB_DIR/recipes.sh"
 # shellcheck source=../lib/menu.sh
 source "$LIB_DIR/menu.sh"
+# shellcheck source=../lib/workflow.sh
+source "$LIB_DIR/workflow.sh"
 # shellcheck source=../lib/doctor.sh
 source "$LIB_DIR/doctor.sh"
 
@@ -45,6 +47,7 @@ main_menu_loop() {
       snippets) snippets_menu ;;
       knowledge) knowledge_menu ;;
       workspace) workspace_menu ;;
+      findings) findings_menu ;;
       flow) flow_ui ;;
       automation) automation_menu ;;
       favorit) favorites_menu ;;
@@ -123,6 +126,20 @@ main() {
     workspace)
       shift
       workspace_cli "$@"
+      ;;
+    findings)
+      shift
+      case "${1:-list}" in
+        list) findings_list "${2:-all}" ;;
+        export) findings_export ;;
+        *) die "Gunakan: netlauncher findings list [filter] | export" ;;
+      esac
+      ;;
+    repo-scan)
+      shift
+      [ -n "${1:-}" ] || die "Gunakan: netlauncher repo-scan <direktori-repo>"
+      confirm_authorized_action repo-scan "local repository scan: $1" 0 || die "Dibatalkan."
+      repo_scan "$1"
       ;;
     automation)
       require_fzf
